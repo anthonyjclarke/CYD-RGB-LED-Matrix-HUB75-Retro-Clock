@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CYD Retro Clock</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>CYD LED Matrix Retro Clock</h1>
+    <div class="sub">Web status + display mirror</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Status</h2>
+      <div class="row">
+        <div><span class="k">Time</span> <span id="time">--:--:--</span></div>
+        <div><span class="k">Date</span> <span id="date">----</span></div>
+      </div>
+      <div class="row">
+        <div><span class="k">WiFi</span> <span id="wifi">--</span></div>
+        <div><span class="k">IP</span> <span id="ip">--</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Display mirror</h2>
+      <canvas id="mirror" width="128" height="32"></canvas>
+      <div class="hint">This is the 128×32 “LED grid” framebuffer. We’ll upgrade this later to a nicer mirror and add sensor data.</div>
+    </section>
+
+    <section class="card">
+      <h2>Config</h2>
+      <div class="grid">
+        <label>Timezone (IANA)
+          <input id="tz" placeholder="Australia/Sydney">
+        </label>
+        <label>NTP server
+          <input id="ntp" placeholder="pool.ntp.org">
+        </label>
+        <label>24-hour time
+          <select id="use24h">
+            <option value="true">24h</option>
+            <option value="false">12h</option>
+          </select>
+        </label>
+
+        <label>LED diameter (px)
+          <input id="ledd" type="number" min="2" max="12">
+        </label>
+        <label>LED gap (px)
+          <input id="ledg" type="number" min="0" max="6">
+        </label>
+        <label>LED color
+          <input id="col" type="color" value="#ff0000">
+        </label>
+        <label>Brightness (0-255)
+          <input id="bl" type="number" min="0" max="255">
+        </label>
+      </div>
+
+      <button id="save">Save & Apply</button>
+      <div id="msg" class="msg"></div>
+    </section>
+  </main>
+
+  <footer>
+    <small>OTA: enabled (ArduinoOTA). Change OTA password in include/config.h</small>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
