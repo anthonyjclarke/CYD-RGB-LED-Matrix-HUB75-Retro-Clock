@@ -21,6 +21,9 @@
 #define TFT_BL   21
 #define TFT_BACKLIGHT_ON HIGH
 
+// No touch panel used on this build
+#define TOUCH_CS -1
+
 #define SPI_FREQUENCY  40000000
 #define SPI_READ_FREQUENCY  20000000
 #define SPI_TOUCH_FREQUENCY  2500000

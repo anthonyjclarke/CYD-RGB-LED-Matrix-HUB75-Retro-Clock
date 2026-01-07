@@ -27,8 +27,8 @@
 
     <section class="card">
       <h2>Display mirror</h2>
-      <canvas id="mirror" width="128" height="32"></canvas>
-      <div class="hint">This is the 128×32 “LED grid” framebuffer. We’ll upgrade this later to a nicer mirror and add sensor data.</div>
+      <canvas id="mirror" width="320" height="240" style="border: 1px solid #444;"></canvas>
+      <div class="hint">This is the 64×32 “LED grid” framebuffer. We’ll upgrade this later to a nicer mirror and add sensor data.</div>
     </section>
 
     <section class="card">
@@ -48,10 +48,10 @@
         </label>
 
         <label>LED diameter (px)
-          <input id="ledd" type="number" min="2" max="12">
+          <input id="ledd" type="number" min="1" max="10">
         </label>
         <label>LED gap (px)
-          <input id="ledg" type="number" min="0" max="6">
+          <input id="ledg" type="number" min="0" max="8">
         </label>
         <label>LED color
           <input id="col" type="color" value="#ff0000">
