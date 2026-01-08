@@ -8,7 +8,7 @@
 
 A retro-style RGB LED Matrix (HUB75) clock for the ESP32-2432S028 (CYD - Cheap Yellow Display) that emulates a **64×32 RGB LED Matrix Panel (HUB75)** on a 320×240 TFT display. Features large 7-segment digits with smooth morphing animations, WiFi connectivity, NTP time synchronization, and a web-based configuration interface.
 
-![Clock Display](images/Display1.jpg)
+![Clock Display](images/Display1_anim.gif)
 
 ## Features
 
