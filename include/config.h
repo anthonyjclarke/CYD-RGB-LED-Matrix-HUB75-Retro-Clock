@@ -5,6 +5,9 @@
 // Starting scope: WiFiManager + NTP + WebUI + TFT "LED Matrix" emulation + simple morphing
 // -----------------------------
 
+// ===== FIRMWARE VERSION =====
+#define FIRMWARE_VERSION "1.0.0"
+
 // ===== LED MATRIX EMULATION =====
 // Logical LED grid (single 64x32 panel)
 #ifndef LED_MATRIX_W
@@ -27,7 +30,7 @@
 #define DEFAULT_LED_COLOR_565 0xF800
 
 // ===== TIME / NTP =====
-#define DEFAULT_TZ "Australia/Sydney"     // IANA time zone (mapped to POSIX TZ)
+#define DEFAULT_TZ "Sydney, Australia"    // Timezone name from timezones.h
 #define DEFAULT_NTP "pool.ntp.org"
 #define DEFAULT_24H true
 

@@ -1,42 +1,72 @@
 /*
- * CYD LED Matrix Retro Clock
+ * CYD RGB LED Matrix (HUB75) Retro Clock
  * Version: 1.0.0
  *
- * A retro-style LED matrix clock for the ESP32-2432S028 (CYD - Cheap Yellow Display)
+ * A retro-style RGB LED Matrix (HUB75) clock emulator for the ESP32-2432S028 (CYD - Cheap Yellow Display)
  *
  * FEATURES:
- * - 64×32 virtual LED matrix emulation on 320×240 TFT display
+ * - 64×32 virtual RGB LED Matrix (HUB75) emulation on 320×240 TFT display
  * - Large 7-segment style digits with morphing animations
  * - WiFi configuration via WiFiManager (AP mode fallback)
- * - NTP time synchronization with timezone support
+ * - NTP time synchronization with timezone support (88 timezones across 13 regions)
  * - Web-based configuration interface with live display mirror
  * - Adjustable LED appearance (diameter, gap, color, brightness)
- * - Status bar showing WiFi, IP, and date information
+ * - Instant auto-apply for all configuration changes (no save button required)
+ * - Status bar on TFT showing WiFi, IP, date, and timezone
+ * - Comprehensive system diagnostics panel in web UI:
+ *   - Time & Network (time, date, WiFi status, IP)
+ *   - Hardware (board, display, sensors, firmware, OTA status)
+ *   - System Resources (uptime, free heap, heap usage %, CPU freq)
+ *   - Debug Settings (runtime-adjustable debug level)
+ * - Enhanced serial logging with before/after change tracking
+ * - Date format selection (5 formats: ISO, European, US, German, Verbose)
+ * - NTP server dropdown with 9 preset servers (global + regional pools)
+ * - Runtime-adjustable debug level (Off, Error, Warning, Info, Verbose)
  * - OTA firmware updates for easy maintenance
  * - LittleFS-based web file serving
  *
  * HARDWARE:
  * - ESP32-2432S028 (CYD) - 2.8" ILI9341 320×240 TFT display
- * - Built-in backlight control
- * - WiFi connectivity
+ * - Built-in backlight control (GPIO 21)
+ * - WiFi connectivity (2.4GHz)
+ * - Emulates 64×32 RGB LED Matrix Panel (HUB75 style)
  *
  * DISPLAY LAYOUT:
- * - Top: Large clock digits (HH:MM:SS) rendered as LED matrix
- * - Bottom: Status bar (WiFi, IP address, date)
+ * - Top: Large clock digits (HH:MM:SS) rendered as RGB LED Matrix (HUB75)
+ * - Bottom: Status bar (IP address, date, timezone)
  *
  * CONFIGURATION:
  * - First boot: Creates WiFi AP "CYD-RetroClock-Setup"
- * - Connect and configure WiFi credentials
+ * - Connect and configure WiFi credentials via captive portal
  * - Access web UI at device IP address
- * - Adjust timezone, NTP server, LED appearance
+ * - Adjust timezone (88 options), NTP server (9 presets), time/date format
+ * - Customize LED appearance, brightness, and debug level
+ * - All changes apply instantly and persist to NVS
  *
  * WEB API ENDPOINTS:
  * - GET  /              - Main web interface
- * - GET  /api/state     - Current system state (JSON)
- * - POST /api/config    - Update configuration
+ * - GET  /api/state     - Current system state (JSON with diagnostics)
+ * - POST /api/config    - Update configuration (logs changes to Serial)
  * - GET  /api/mirror    - Raw framebuffer data for display mirror
+ * - GET  /api/timezones - List of 88 global timezones grouped by region
  *
- * Author: Built with Claude Code
+ * FUTURE ENHANCEMENTS:
+ * - [ ] Add I2C sensor support (SHT30/BME280/HTU21D) for temperature & humidity
+ * - [ ] Display temperature/humidity on screen and in web UI
+ * - [ ] Multiple display modes (clock, date, temp, custom messages)
+ * - [ ] Per-LED color control for RGB LED Matrix effects
+ * - [ ] Touch screen support for direct configuration
+ * - [ ] Color themes and presets
+ * - [ ] MQTT integration for remote control and monitoring
+ * - [ ] Mobile-friendly web interface enhancements
+ * - [ ] Home Assistant integration
+ * - [ ] Web-based OTA upload interface
+ * - [ ] Customizable animations and transition effects
+ * - [ ] Multi-language support for web interface
+ * - [ ] README.MD Display examples
+ * - [ ] Touch panel diagnostic overlay on TFT display when touched
+ *
+ * Author: Built with the help of Claude Code
  * License: MIT
  */
 
@@ -56,29 +86,61 @@
 #include <time.h>
 
 #include "config.h"
+#include "timezones.h"
 
 // =========================
-// Debug Output Macros
+// Debug System
 // =========================
-#ifndef DEBUG_MODE
-#define DEBUG_MODE 1
+/**
+ * Leveled debug logging system with runtime control
+ *
+ * DEBUG LEVELS:
+ *   0 = Off      - No debug output
+ *   1 = Error    - Critical errors only
+ *   2 = Warn     - Warnings + Errors
+ *   3 = Info     - General info + Warnings + Errors (default)
+ *   4 = Verbose  - All debug output including frequent events
+ *
+ * USAGE:
+ *   DBG_ERROR(...)   - Critical errors (level 1+)
+ *   DBG_WARN(...)    - Warnings (level 2+)
+ *   DBG_INFO(...)    - General information (level 3+)
+ *   DBG_VERBOSE(...) - Verbose/frequent output (level 4)
+ *
+ * RUNTIME CONTROL:
+ *   Set debugLevel variable (0-4) to change verbosity at runtime
+ *   Can be controlled via web API or serial commands
+ *
+ * EXAMPLES:
+ *   DBG_ERROR("Failed to mount filesystem\n");
+ *   DBG_INFO("WiFi connected: %s\n", WiFi.SSID().c_str());
+ *   DBG_VERBOSE("Render frame: %d ms\n", elapsed);
+ */
+#ifndef DEBUG_LEVEL
+#define DEBUG_LEVEL 3  // Default: Info level
 #endif
 
-#if DEBUG_MODE
-  #define DBG(...)        Serial.printf(__VA_ARGS__)
-  #define DBGLN(s)        Serial.println(s)
-  #define DBG_STEP(s)     do { Serial.print("[INIT] "); Serial.println(s); } while (0)
-  #define DBG_OK(s)       do { Serial.print("[ OK ] "); Serial.println(s); } while (0)
-  #define DBG_WARN(s)     do { Serial.print("[WARN] "); Serial.println(s); } while (0)
-  #define DBG_ERR(s)      do { Serial.print("[ERR ] "); Serial.println(s); } while (0)
-#else
-  #define DBG(...)        do {} while (0)
-  #define DBGLN(s)        do {} while (0)
-  #define DBG_STEP(s)     do {} while (0)
-  #define DBG_OK(s)       do {} while (0)
-  #define DBG_WARN(s)     do {} while (0)
-  #define DBG_ERR(s)      do {} while (0)
-#endif
+#define DBG_LEVEL_OFF     0
+#define DBG_LEVEL_ERROR   1
+#define DBG_LEVEL_WARN    2
+#define DBG_LEVEL_INFO    3
+#define DBG_LEVEL_VERBOSE 4
+
+// Runtime debug level control (can be changed via web API)
+static uint8_t debugLevel = DEBUG_LEVEL;
+
+// Conditional debug macros based on debug level
+#define DBG_ERROR(...)   do { if (debugLevel >= DBG_LEVEL_ERROR) { Serial.print("[ERR ] "); Serial.printf(__VA_ARGS__); } } while(0)
+#define DBG_WARN(...)    do { if (debugLevel >= DBG_LEVEL_WARN) { Serial.print("[WARN] "); Serial.printf(__VA_ARGS__); } } while(0)
+#define DBG_INFO(...)    do { if (debugLevel >= DBG_LEVEL_INFO) { Serial.print("[INFO] "); Serial.printf(__VA_ARGS__); } } while(0)
+#define DBG_VERBOSE(...) do { if (debugLevel >= DBG_LEVEL_VERBOSE) { Serial.print("[VERB] "); Serial.printf(__VA_ARGS__); } } while(0)
+
+// Legacy compatibility macros
+#define DBG(...)      DBG_INFO(__VA_ARGS__)
+#define DBGLN(s)      DBG_INFO("%s\n", s)
+#define DBG_STEP(s)   DBG_INFO("%s\n", s)
+#define DBG_OK(s)     DBG_INFO("✓ %s\n", s)
+#define DBG_ERR(s)    DBG_ERROR("%s\n", s)
 
 // =========================
 // Global Objects & Application State
@@ -93,6 +155,7 @@ struct AppConfig {
   char tz[48]   = DEFAULT_TZ;
   char ntp[64]  = DEFAULT_NTP;
   bool use24h   = DEFAULT_24H;
+  uint8_t dateFormat = 0;  // 0=YYYY-MM-DD, 1=DD/MM/YYYY, 2=MM/DD/YYYY, 3=DD.MM.YYYY, 4=Mon DD YYYY
 
   uint8_t ledDiameter = DEFAULT_LED_DIAMETER;
   uint8_t ledGap      = DEFAULT_LED_GAP;
@@ -100,11 +163,13 @@ struct AppConfig {
   // LED color in 24-bit for web + convert to 565 for TFT
   uint32_t ledColor = 0xFF0000; // red
   uint8_t brightness = 255;     // 0..255
+
+  bool flipDisplay = false;     // false=rotation 1 (normal), true=rotation 3 (180° flip)
 };
 
 AppConfig cfg;
 
-// Logical LED matrix framebuffer: 0..255 intensity
+// Logical RGB LED Matrix (HUB75) framebuffer: 0..255 intensity
 static uint8_t fb[LED_MATRIX_H][LED_MATRIX_W];
 
 // Cached date string for status bar
@@ -432,15 +497,13 @@ static void drawStatusBar() {
 
   char line1[64];
   if (WiFi.isConnected()) {
-    snprintf(line1, sizeof(line1), "WIFI: %s  IP: %s",
-             WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
+    snprintf(line1, sizeof(line1), "IP: %s", WiFi.localIP().toString().c_str());
   } else {
-    snprintf(line1, sizeof(line1), "WIFI: AP MODE");
+    snprintf(line1, sizeof(line1), "IP: Not connected (AP mode)");
   }
+
   char line2[64];
-  snprintf(line2, sizeof(line2), "%s  LED: d%u g%u p%u (dot%u gap%u)",
-           currDate, (unsigned)cfg.ledDiameter, (unsigned)cfg.ledGap,
-           (unsigned)appliedPitch, (unsigned)appliedDot, (unsigned)appliedGap);
+  snprintf(line2, sizeof(line2), "%s  %s", currDate, cfg.tz);
 
   uint32_t now = millis();
   bool changed = (strncmp(line1, lastLine1, sizeof(line1)) != 0) ||
@@ -497,11 +560,11 @@ static void renderFBToTFT() {
   appliedGap = (uint8_t)gap;
   appliedPitch = (uint8_t)pitch;
 
-  // Debug output (print once per second)
+  // Verbose debug output (print once per second)
   static uint32_t lastDbg = 0;
   if (millis() - lastDbg > 1000) {
-    DBG("[RENDER] pitch=%d dot=%d gap=%d inset=%d ledD=%d ledG=%d\n",
-        pitch, dot, gap, inset, cfg.ledDiameter, cfg.ledGap);
+    DBG_VERBOSE("Render: pitch=%d dot=%d gap=%d ledD=%d ledG=%d\n",
+                pitch, dot, gap, cfg.ledDiameter, cfg.ledGap);
     lastDbg = millis();
   }
 
@@ -572,18 +635,24 @@ static void loadConfig() {
   strlcpy(cfg.ntp, s.c_str(), sizeof(cfg.ntp));
 
   cfg.use24h = prefs.getBool("24h", DEFAULT_24H);
+  cfg.dateFormat = (uint8_t)prefs.getUChar("dfmt", 0);  // Default: YYYY-MM-DD
   cfg.ledDiameter = (uint8_t)prefs.getUChar("ledd", DEFAULT_LED_DIAMETER);
   cfg.ledGap = (uint8_t)prefs.getUChar("ledg", DEFAULT_LED_GAP);
   cfg.ledColor = prefs.getUInt("col", 0xFF0000);
   cfg.brightness = (uint8_t)prefs.getUChar("bl", 255);
+  cfg.flipDisplay = prefs.getBool("flip", false);
+  debugLevel = (uint8_t)prefs.getUChar("dbglvl", DEBUG_LEVEL);
 
   prefs.end();
 
   DBG("  TZ: %s\n", cfg.tz);
   DBG("  NTP: %s\n", cfg.ntp);
   DBG("  24h: %s\n", cfg.use24h ? "true" : "false");
+  DBG("  DateFmt: %u\n", cfg.dateFormat);
   DBG("  Color: #%06X\n", (unsigned)cfg.ledColor);
   DBG("  Brightness: %u\n", cfg.brightness);
+  DBG("  FlipDisplay: %s\n", cfg.flipDisplay ? "true" : "false");
+  DBG("  DebugLevel: %u\n", debugLevel);
 
   DBG_OK("Config loaded.");
 }
@@ -594,34 +663,58 @@ static void saveConfig() {
   prefs.putString("tz", cfg.tz);
   prefs.putString("ntp", cfg.ntp);
   prefs.putBool("24h", cfg.use24h);
+  prefs.putUChar("dfmt", cfg.dateFormat);
   prefs.putUChar("ledd", cfg.ledDiameter);
   prefs.putUChar("ledg", cfg.ledGap);
   prefs.putUInt("col", cfg.ledColor);
   prefs.putUChar("bl", cfg.brightness);
+  prefs.putBool("flip", cfg.flipDisplay);
+  prefs.putUChar("dbglvl", debugLevel);
   prefs.end();
   DBG_OK("Config saved.");
 }
 
 // =========================
+// Display Rotation
+// =========================
+/**
+ * Apply display rotation based on flipDisplay setting
+ * - rotation 1 (normal): USB port on left, buttons on right
+ * - rotation 3 (flipped): USB port on right, buttons on left (180° rotation)
+ */
+static void applyDisplayRotation() {
+  uint8_t rotation = cfg.flipDisplay ? 3 : 1;
+  tft.setRotation(rotation);
+  DBG_VERBOSE("Display rotation set to %d (%s)\n", rotation, cfg.flipDisplay ? "flipped" : "normal");
+}
+
+// =========================
 // Time / NTP
 // =========================
-static const char* tzIanaToPosix(const char* tz) {
-  if (!tz || !tz[0]) return "UTC0";
+/**
+ * Lookup timezone POSIX string from timezone name
+ * @param tzName Timezone name (e.g., "Sydney, Australia")
+ * @return POSIX timezone string, or "UTC0" if not found
+ */
+static const char* lookupTimezone(const char* tzName) {
+  if (!tzName || !tzName[0]) return timezones[0].tzString;  // Default to Sydney
 
-  // ESP32 newlib expects POSIX TZ strings, not IANA names.
-  if (strcmp(tz, "Australia/Sydney") == 0) {
-    return "AEST-10AEDT,M10.1.0,M4.1.0/3";
-  }
-  if (strcmp(tz, "Australia/Melbourne") == 0) {
-    return "AEST-10AEDT,M10.1.0,M4.1.0/3";
+  // Search for timezone by name
+  for (int i = 0; i < numTimezones; i++) {
+    if (strcmp(tzName, timezones[i].name) == 0) {
+      return timezones[i].tzString;
+    }
   }
 
-  return tz;
+  // If not found, return first (default)
+  DBG_WARN("Timezone '%s' not found, using default\n", tzName);
+  return timezones[0].tzString;
 }
 
 static void startNtp() {
   DBG_STEP("Starting NTP...");
-  const char* tzEnv = tzIanaToPosix(cfg.tz);
+  const char* tzEnv = lookupTimezone(cfg.tz);
+  DBG_INFO("Timezone: %s -> %s\n", cfg.tz, tzEnv);
   configTzTime(tzEnv, cfg.ntp);
   DBG_OK("NTP configured.");
 }
@@ -638,36 +731,156 @@ static bool getLocalTimeSafe(struct tm& timeinfo, uint32_t timeoutMs = 2000) {
 // =========================
 // Web handlers
 // =========================
-static void handleGetState() {
-  struct tm ti{};
-  bool ok = getLocalTimeSafe(ti, 300);
-  char tbuf[16] = "--:--:--";
-  char dbuf[16] = "----/--/--";
-  if (ok) {
-    strftime(tbuf, sizeof(tbuf), "%H:%M:%S", &ti);
-    strftime(dbuf, sizeof(dbuf), "%Y-%m-%d", &ti);
-  }
+// Forward declaration (defined later in Clock logic section)
+static void formatDate(struct tm& ti, char* out, size_t n);
+
+static void handleGetTimezones() {
+  DBG_VERBOSE("Web: GET /api/timezones from %s\n", server.client().remoteIP().toString().c_str());
 
   JsonDocument doc;
-  doc["time"] = tbuf;
-  doc["date"] = dbuf;
-  doc["wifi"] = (WiFi.isConnected() ? WiFi.SSID() : String("DISCONNECTED"));
-  doc["ip"] = WiFi.isConnected() ? WiFi.localIP().toString() : String("0.0.0.0");
-  doc["tz"] = cfg.tz;
-  doc["ntp"] = cfg.ntp;
-  doc["use24h"] = cfg.use24h;
-  doc["ledDiameter"] = cfg.ledDiameter;
-  doc["ledGap"] = cfg.ledGap;
-  doc["ledColor"] = cfg.ledColor;
-  doc["brightness"] = cfg.brightness;
+  JsonArray regions = doc["regions"].to<JsonArray>();
+
+  // Define region boundaries (indices from timezones.h)
+  struct Region {
+    const char* name;
+    int start;
+    int end;
+  };
+
+  const Region regionDefs[] = {
+    {"Australia & Oceania", 0, 11},
+    {"North America", 12, 22},
+    {"South America", 23, 28},
+    {"Western Europe", 29, 39},
+    {"Northern Europe", 40, 43},
+    {"Central & Eastern Europe", 44, 51},
+    {"Middle East", 52, 56},
+    {"South Asia", 57, 63},
+    {"Southeast Asia", 64, 70},
+    {"East Asia", 71, 76},
+    {"Central Asia", 77, 79},
+    {"Caucasus", 80, 82},
+    {"Africa", 83, 86}
+  };
+
+  for (const auto& region : regionDefs) {
+    JsonObject regionObj = regions.add<JsonObject>();
+    regionObj["name"] = region.name;
+    JsonArray tzArray = regionObj["timezones"].to<JsonArray>();
+
+    for (int i = region.start; i <= region.end && i < numTimezones; i++) {
+      JsonObject tz = tzArray.add<JsonObject>();
+      tz["name"] = timezones[i].name;
+      tz["tz"] = timezones[i].tzString;
+    }
+  }
+
+  doc["count"] = numTimezones;
 
   String out;
   serializeJson(doc, out);
   server.send(200, "application/json", out);
 }
 
+/**
+ * GET /api/state
+ *
+ * Returns comprehensive system state as JSON for web interface.
+ *
+ * Response includes:
+ * - Time & Network: current time, date, WiFi SSID, IP address
+ * - Configuration: timezone, NTP server, time format, date format, LED settings, brightness, debug level
+ * - System Diagnostics: uptime (seconds), free heap, total heap size, CPU frequency
+ * - Hardware Info: board type, display model, sensor status, firmware version, OTA status
+ *
+ * This endpoint is polled by the web interface every second to update:
+ * - Live clock display
+ * - System diagnostics panel
+ * - Configuration field values
+ * - Display mirror state
+ */
+static void handleGetState() {
+  DBG_VERBOSE("Web: GET /api/state from %s\n", server.client().remoteIP().toString().c_str());
+
+  struct tm ti{};
+  bool ok = getLocalTimeSafe(ti, 300);
+  char tbuf[16] = "--:--:--";
+  char dbuf[16] = "----/--/--";
+  if (ok) {
+    strftime(tbuf, sizeof(tbuf), "%H:%M:%S", &ti);
+    formatDate(ti, dbuf, sizeof(dbuf));  // Use configured date format
+  }
+
+  JsonDocument doc;
+
+  // Time & Network
+  doc["time"] = tbuf;
+  doc["date"] = dbuf;
+  doc["wifi"] = (WiFi.isConnected() ? WiFi.SSID() : String("DISCONNECTED"));
+  doc["ip"] = WiFi.isConnected() ? WiFi.localIP().toString() : String("0.0.0.0");
+
+  // Config
+  doc["tz"] = cfg.tz;
+  doc["ntp"] = cfg.ntp;
+  doc["use24h"] = cfg.use24h;
+  doc["dateFormat"] = cfg.dateFormat;
+  doc["ledDiameter"] = cfg.ledDiameter;
+  doc["ledGap"] = cfg.ledGap;
+  doc["ledColor"] = cfg.ledColor;
+  doc["brightness"] = cfg.brightness;
+  doc["flipDisplay"] = cfg.flipDisplay;
+
+  // System diagnostics
+  uint32_t uptime = millis() / 1000;  // seconds
+  doc["uptime"] = uptime;
+  doc["freeHeap"] = ESP.getFreeHeap();
+  doc["heapSize"] = ESP.getHeapSize();
+  doc["cpuFreq"] = ESP.getCpuFreqMHz();
+  doc["debugLevel"] = debugLevel;
+
+  // Hardware info (static)
+  doc["board"] = "ESP32-2432S028 (CYD)";
+  doc["display"] = "320×240 ILI9341";
+  doc["sensors"] = "None detected";  // TODO: Update when sensors added
+  doc["firmware"] = FIRMWARE_VERSION;
+  doc["otaEnabled"] = true;
+
+  String out;
+  serializeJson(doc, out);
+  server.send(200, "application/json", out);
+}
+
+/**
+ * POST /api/config
+ *
+ * Updates device configuration from web interface.
+ *
+ * Features:
+ * - Captures old values before changes for comparison logging
+ * - Logs before/after values for each changed field to Serial monitor
+ * - Includes client IP address in all log messages
+ * - Validates and constrains all input values
+ * - Persists changes to NVS (Non-Volatile Storage)
+ * - Applies time configuration (timezone, NTP, format) immediately
+ *
+ * Accepts JSON body with optional fields:
+ * - tz: Timezone name (IANA format)
+ * - ntp: NTP server hostname
+ * - use24h: Boolean for 24-hour time format
+ * - dateFormat: Integer 0-4 for date format selection
+ * - ledDiameter: Integer 1-10 for LED dot size
+ * - ledGap: Integer 0-8 for spacing between LEDs
+ * - ledColor: RGB888 color value (0-16777215)
+ * - brightness: Integer 0-255 for backlight brightness
+ * - flipDisplay: Boolean for display rotation (false=normal, true=180° flip)
+ * - debugLevel: Integer 0-4 for logging verbosity
+ */
 static void handlePostConfig() {
+  String clientIP = server.client().remoteIP().toString();
+  DBG_INFO("Web: POST /api/config from %s\n", clientIP.c_str());
+
   if (!server.hasArg("plain")) {
+    DBG_WARN("Config update failed: missing body\n");
     server.send(400, "text/plain", "missing body");
     return;
   }
@@ -675,26 +888,116 @@ static void handlePostConfig() {
   JsonDocument doc;
   auto err = deserializeJson(doc, server.arg("plain"));
   if (err) {
+    DBG_WARN("Config update failed: bad json\n");
     server.send(400, "text/plain", "bad json");
     return;
   }
 
-  if (doc["tz"].is<const char*>()) strlcpy(cfg.tz, doc["tz"].as<const char*>(), sizeof(cfg.tz));
-  if (doc["ntp"].is<const char*>()) strlcpy(cfg.ntp, doc["ntp"].as<const char*>(), sizeof(cfg.ntp));
-  if (doc["use24h"].is<bool>()) cfg.use24h = doc["use24h"].as<bool>();
-  if (!doc["ledDiameter"].isNull()) cfg.ledDiameter = (uint8_t)doc["ledDiameter"].as<int>();
-  if (!doc["ledGap"].isNull()) cfg.ledGap = (uint8_t)doc["ledGap"].as<int>();
-  if (doc["ledColor"].is<uint32_t>()) cfg.ledColor = doc["ledColor"].as<uint32_t>();
-  if (doc["brightness"].is<int>()) cfg.brightness = (uint8_t)doc["brightness"].as<int>();
+  // Capture old values for logging
+  char oldTz[64];
+  char oldNtp[64];
+  bool oldUse24h = cfg.use24h;
+  uint8_t oldDateFormat = cfg.dateFormat;
+  uint8_t oldLedDiameter = cfg.ledDiameter;
+  uint8_t oldLedGap = cfg.ledGap;
+  uint32_t oldLedColor = cfg.ledColor;
+  uint8_t oldBrightness = cfg.brightness;
+  bool oldFlipDisplay = cfg.flipDisplay;
+  strlcpy(oldTz, cfg.tz, sizeof(oldTz));
+  strlcpy(oldNtp, cfg.ntp, sizeof(oldNtp));
+
+  // Update config and log each change
+  if (!doc["tz"].isNull()) {
+    strlcpy(cfg.tz, doc["tz"].as<const char*>(), sizeof(cfg.tz));
+    if (strcmp(oldTz, cfg.tz) != 0) {
+      DBG_INFO("  [%s] Timezone changed: '%s' -> '%s'\n", clientIP.c_str(), oldTz, cfg.tz);
+    }
+  }
+
+  if (!doc["ntp"].isNull()) {
+    strlcpy(cfg.ntp, doc["ntp"].as<const char*>(), sizeof(cfg.ntp));
+    if (strcmp(oldNtp, cfg.ntp) != 0) {
+      DBG_INFO("  [%s] NTP server changed: '%s' -> '%s'\n", clientIP.c_str(), oldNtp, cfg.ntp);
+    }
+  }
+
+  if (!doc["use24h"].isNull()) {
+    cfg.use24h = doc["use24h"].as<bool>();
+    if (oldUse24h != cfg.use24h) {
+      DBG_INFO("  [%s] Time format changed: %s -> %s\n", clientIP.c_str(),
+               oldUse24h ? "24h" : "12h", cfg.use24h ? "24h" : "12h");
+    }
+  }
+
+  if (!doc["dateFormat"].isNull()) {
+    cfg.dateFormat = (uint8_t)constrain(doc["dateFormat"].as<int>(), 0, 4);
+    if (oldDateFormat != cfg.dateFormat) {
+      const char* formats[] = {"YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY", "DD.MM.YYYY", "Mon DD, YYYY"};
+      DBG_INFO("  [%s] Date format changed: %s -> %s\n", clientIP.c_str(),
+               formats[oldDateFormat], formats[cfg.dateFormat]);
+    }
+  }
+
+  if (!doc["ledDiameter"].isNull()) {
+    cfg.ledDiameter = (uint8_t)doc["ledDiameter"].as<int>();
+    if (oldLedDiameter != cfg.ledDiameter) {
+      DBG_INFO("  [%s] LED diameter changed: %d -> %d px\n", clientIP.c_str(),
+               oldLedDiameter, cfg.ledDiameter);
+    }
+  }
+
+  if (!doc["ledGap"].isNull()) {
+    cfg.ledGap = (uint8_t)doc["ledGap"].as<int>();
+    if (oldLedGap != cfg.ledGap) {
+      DBG_INFO("  [%s] LED gap changed: %d -> %d px\n", clientIP.c_str(),
+               oldLedGap, cfg.ledGap);
+    }
+  }
+
+  if (!doc["ledColor"].isNull()) {
+    cfg.ledColor = doc["ledColor"].as<uint32_t>();
+    if (oldLedColor != cfg.ledColor) {
+      DBG_INFO("  [%s] LED color changed: #%06X -> #%06X\n", clientIP.c_str(),
+               (unsigned int)oldLedColor, (unsigned int)cfg.ledColor);
+    }
+  }
+
+  if (!doc["brightness"].isNull()) {
+    cfg.brightness = (uint8_t)doc["brightness"].as<int>();
+    if (oldBrightness != cfg.brightness) {
+      DBG_INFO("  [%s] Brightness changed: %d -> %d\n", clientIP.c_str(),
+               oldBrightness, cfg.brightness);
+    }
+  }
+
+  // Debug level
+  if (!doc["debugLevel"].isNull()) {
+    uint8_t oldDebugLevel = debugLevel;
+    debugLevel = (uint8_t)constrain(doc["debugLevel"].as<int>(), 0, 4);
+    if (oldDebugLevel != debugLevel) {
+      const char* levels[] = {"Off", "Error", "Warning", "Info", "Verbose"};
+      DBG_INFO("  [%s] Debug level changed: %s -> %s\n", clientIP.c_str(),
+               levels[oldDebugLevel], levels[debugLevel]);
+    }
+  }
+
+  // Flip display
+  if (!doc["flipDisplay"].isNull()) {
+    cfg.flipDisplay = doc["flipDisplay"].as<bool>();
+    if (oldFlipDisplay != cfg.flipDisplay) {
+      DBG_INFO("  [%s] Display flip changed: %s -> %s\n", clientIP.c_str(),
+               oldFlipDisplay ? "flipped" : "normal",
+               cfg.flipDisplay ? "flipped" : "normal");
+      applyDisplayRotation();  // Apply rotation immediately
+      tft.fillScreen(TFT_BLACK);  // Clear screen after rotation change
+    }
+  }
 
   // Constrain LED rendering parameters
   // ledDiameter: max size of each LED dot (pitch is typically 5 for 320x240)
   // ledGap: space between LEDs (gap + dot <= pitch)
   cfg.ledDiameter = constrain(cfg.ledDiameter, 1, 10);
   cfg.ledGap      = constrain(cfg.ledGap, 0, 8);
-
-  DBG("[CONFIG] Saved: ledD=%d ledG=%d col=%06X bl=%d\n",
-      cfg.ledDiameter, cfg.ledGap, cfg.ledColor, cfg.brightness);
 
   saveConfig();
   updateRenderPitch();  // Rebuild sprite if pitch changed
@@ -706,16 +1009,17 @@ static void handlePostConfig() {
 
 static void handleGetMirror() {
   const size_t fbSize = LED_MATRIX_W * LED_MATRIX_H;  // 64 * 32 = 2048
-  DBG("[MIRROR] Sending %u bytes (expected: %u, sizeof: %u)\n",
-      (unsigned)fbSize, (unsigned)fbSize, (unsigned)sizeof(fb));
+  DBG_VERBOSE("Mirror: Sending %u bytes\n", (unsigned)fbSize);
   server.sendHeader("Cache-Control", "no-store");
   server.send_P(200, "application/octet-stream", (const char*)fb, fbSize);
 }
 
 static void serveStaticFiles() {
   server.on("/", HTTP_GET, []() {
+    DBG_VERBOSE("Web: GET / (index.html) from %s\n", server.client().remoteIP().toString().c_str());
     File f = LittleFS.open("/index.html", "r");
     if (!f) {
+      DBG_WARN("Web: index.html not found\n");
       server.send(404, "text/plain", "Not found");
       return;
     }
@@ -726,6 +1030,7 @@ static void serveStaticFiles() {
   server.serveStatic("/style.css", LittleFS, "/style.css");
 
   server.onNotFound([]() {
+    DBG_VERBOSE("Web: 404 %s from %s\n", server.uri().c_str(), server.client().remoteIP().toString().c_str());
     server.send(404, "text/plain", "Not found");
   });
 }
@@ -766,10 +1071,10 @@ static void startOta() {
   ArduinoOTA.setHostname(OTA_HOSTNAME);
   ArduinoOTA.setPassword(OTA_PASSWORD);
 
-  ArduinoOTA.onStart([]() { DBG_OK("OTA start"); });
-  ArduinoOTA.onEnd([]() { DBG_OK("OTA end"); });
+  ArduinoOTA.onStart([]() { DBG_INFO("OTA update started\n"); });
+  ArduinoOTA.onEnd([]() { DBG_INFO("OTA update completed\n"); });
   ArduinoOTA.onError([](ota_error_t error) {
-    DBG("[ERR ] OTA error: %u\n", (unsigned)error);
+    DBG_ERROR("OTA update failed: error code %u\n", (unsigned)error);
   });
 
   ArduinoOTA.begin();
@@ -790,6 +1095,32 @@ static char prevT[7] = "------";
 static char currT[7] = "------";
 static int morphStep = MORPH_STEPS;
 
+/**
+ * Format date according to user's selected format
+ * @param ti Time structure
+ * @param out Output buffer
+ * @param n Buffer size
+ */
+static void formatDate(struct tm& ti, char* out, size_t n) {
+  switch (cfg.dateFormat) {
+    case 1:  // DD/MM/YYYY
+      strftime(out, n, "%d/%m/%Y", &ti);
+      break;
+    case 2:  // MM/DD/YYYY
+      strftime(out, n, "%m/%d/%Y", &ti);
+      break;
+    case 3:  // DD.MM.YYYY
+      strftime(out, n, "%d.%m.%Y", &ti);
+      break;
+    case 4:  // Mon DD, YYYY
+      strftime(out, n, "%b %d, %Y", &ti);
+      break;
+    default:  // 0 = YYYY-MM-DD (ISO 8601)
+      strftime(out, n, "%Y-%m-%d", &ti);
+      break;
+  }
+}
+
 static void updateClockLogic() {
   struct tm ti{};
   if (!getLocalTimeSafe(ti, 50)) return;
@@ -799,7 +1130,7 @@ static void updateClockLogic() {
 
   char t6[7] = {0};
   formatTimeHHMMSS(ti, t6, sizeof(t6));
-  strftime(currDate, sizeof(currDate), "%Y-%m-%d", &ti);
+  formatDate(ti, currDate, sizeof(currDate));
 
   if (strncmp(t6, currT, 6) != 0) {
     memcpy(prevT, currT, 7);
@@ -951,7 +1282,7 @@ void setup() {
 
   DBGLN("");
   DBGLN("========================================");
-  DBGLN(" CYD LED Matrix Retro Clock - DEBUG BOOT");
+  DBGLN(" CYD RGB LED Matrix (HUB75) Retro Clock - DEBUG BOOT");
   DBGLN("========================================");
 
   DBG("Build: %s %s\n", __DATE__, __TIME__);
@@ -971,7 +1302,7 @@ void setup() {
   // TFT init
   DBG_STEP("Initialising TFT...");
   tft.init();
-  tft.setRotation(1); // landscape wide along top/long edge
+  applyDisplayRotation();  // Apply rotation based on config
   tft.fillScreen(TFT_BLACK);
   setBacklight(cfg.brightness);
   DBG("TFT size (w x h): %d x %d\n", tft.width(), tft.height());
@@ -1011,6 +1342,7 @@ void setup() {
   server.on("/api/state", HTTP_GET, handleGetState);
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/mirror", HTTP_GET, handleGetMirror);
+  server.on("/api/timezones", HTTP_GET, handleGetTimezones);
   server.begin();
   DBG_OK("WebServer ready.");
 

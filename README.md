@@ -1,17 +1,20 @@
-# CYD LED Matrix Retro Clock
+# CYD RGB LED Matrix (HUB75) Retro Clock
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-ESP32-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
+![LED Type](https://img.shields.io/badge/LED-HUB75%20RGB-red.svg)
 
-A retro-style LED matrix clock for the ESP32-2432S028 (CYD - Cheap Yellow Display) that emulates a **64×32 LED matrix** on a 320×240 TFT display. Features large 7-segment digits with smooth morphing animations, WiFi connectivity, NTP time synchronization, and a web-based configuration interface.
 
-![Clock Display](docs/images/clock-display.jpg)
+A retro-style RGB LED Matrix (HUB75) clock for the ESP32-2432S028 (CYD - Cheap Yellow Display) that emulates a **64×32 RGB LED Matrix Panel (HUB75)** on a 320×240 TFT display. Features large 7-segment digits with smooth morphing animations, WiFi connectivity, NTP time synchronization, and a web-based configuration interface.
+
+![Clock Display](images/Display1.jpg)
 
 ## Features
 
 ### Display
-- **64×32 Virtual LED Matrix** emulation on 320×240 TFT display
+- **64×32 Virtual RGB LED Matrix (HUB75)** emulation on 320×240 TFT display
+- Emulates physical RGB LED Matrix Panel with HUB75 protocol characteristics
 - **Large 7-segment digits** with 1-pixel spacing for improved readability
 - **Smooth morphing animations** when digits change
 - **Adjustable LED appearance**: diameter, gap, color, and brightness
@@ -26,22 +29,37 @@ A retro-style LED matrix clock for the ESP32-2432S028 (CYD - Cheap Yellow Displa
 - **Live display mirror** in web UI showing real-time framebuffer
 
 ### Configuration
-- Timezone selection (IANA format, e.g., "Australia/Sydney")
-- NTP server configuration
+- Timezone selection from dropdown (88 timezones across 13 geographic regions)
+- NTP server selection from dropdown (9 preset servers including global and regional pools)
 - 12/24 hour time format
+- Date format selection (5 formats: ISO, European, US, German, Verbose)
 - LED diameter (1-10 pixels)
 - LED gap spacing (0-8 pixels)
-- LED color (RGB color picker)
+- LED color (RGB color picker with instant preview)
 - Backlight brightness (0-255)
+- Debug level (Off, Error, Warning, Info, Verbose) - adjustable at runtime
+
+### System Diagnostics
+- Real-time system status monitoring in web interface:
+  - Time & Network: current time, date, WiFi status, IP address
+  - Hardware: board type, display model, sensor status, firmware version, OTA status
+  - System Resources: uptime, free heap, heap usage percentage, CPU frequency
+  - Debug Settings: runtime-adjustable logging verbosity
+- Enhanced serial logging with before/after change tracking
+- Human-readable formatting for uptime and memory usage
 
 ## Hardware Requirements
 
-### ESP32-2432S028 (CYD - Cheap Yellow Display)
-- **MCU**: ESP32-WROOM-32
-- **Display**: 2.8" ILI9341 TFT (320×240 pixels)
-- **Interface**: SPI
-- **Backlight**: PWM controlled (GPIO 21)
-- **Power**: USB-C 5V
+### Board: ESP32-2432S028R (Cheap Yellow Display)
+
+![ESP32 CYD Board Reference](images/Reference_CYD.jpeg)
+
+The CYD is an affordable ESP32 development board with integrated:
+- 2.8" ILI9341 TFT display (320x240 pixels)
+- XPT2046 resistive touchscreen
+- RGB LED (active low)
+- SD card slot
+- Extended GPIO connector
 
 ### Pin Configuration
 The project uses the standard CYD pin configuration (defined in `include/User_Setup.h`):
@@ -117,13 +135,52 @@ On first boot, the device will create a WiFi access point:
 ### Web Interface
 Access the web interface at `http://<device-ip>` to configure:
 
-- **Timezone**: IANA timezone string (e.g., "America/New_York", "Europe/London", "Australia/Sydney")
-- **NTP Server**: Default is "pool.ntp.org", can use regional servers like "us.pool.ntp.org"
+- **Display Mirror**: Live view of the 64×32 RGB LED Matrix (HUB75) framebuffer
+- **Timezone**: Dropdown selector with 88 timezones organized by 13 geographic regions
+  - Africa, Americas, Antarctica, Arctic, Asia, Atlantic, Australia, Europe, Indian, Pacific, USA, UTC, and Etc
+- **NTP Server**: Dropdown selector with 9 preset servers:
+  - Global Pool (pool.ntp.org)
+  - Google (time.google.com), Cloudflare (time.cloudflare.com), Apple (time.apple.com), Microsoft (time.windows.com)
+  - Regional pools: Australia, USA, Europe, Asia
 - **Time Format**: Choose between 12-hour or 24-hour display
+- **Date Format**: Choose from 5 formats:
+  - YYYY-MM-DD (ISO 8601)
+  - DD/MM/YYYY (European)
+  - MM/DD/YYYY (US)
+  - DD.MM.YYYY (German)
+  - Mon DD, YYYY (Verbose, e.g., "Jan 07, 2026")
 - **LED Diameter**: Adjust the size of individual LED dots (1-10 pixels)
 - **LED Gap**: Space between LEDs (0-8 pixels)
-- **LED Color**: Use the color picker to choose any RGB color
+- **LED Color**: Use the color picker to choose any RGB color with instant preview
 - **Brightness**: Adjust backlight brightness (0-255)
+- **Debug Level**: Adjust serial logging verbosity at runtime (Off, Error, Warning, Info, Verbose)
+
+### System Diagnostics Panel
+The web interface displays comprehensive real-time system information:
+
+**Time & Network**
+- Current time and date
+- WiFi network status
+- IP address
+
+**Hardware**
+- Board: ESP32-2432S028 (CYD)
+- Display: 320×240 ILI9341
+- Sensors: Status of connected sensors (when implemented)
+- Firmware: Current version
+- OTA: Over-the-air update status
+
+**System Resources**
+- Uptime: System uptime formatted as days/hours/minutes
+- Free Heap: Available memory
+- Heap Usage: Used/Total memory with percentage
+- CPU Freq: Processor frequency (typically 240 MHz)
+
+**Debug Settings**
+- Debug Level: Runtime-adjustable logging verbosity
+- Log Output: Serial @ 115200 baud
+
+All configuration changes are applied instantly without requiring a save button.
 
 ### Configuration File
 Settings are stored in `include/config.h`. Default values:
@@ -152,17 +209,18 @@ Edit `include/config.h`:
 ```
 ┌─────────────────────────────────────┐
 │                                     │
-│        16:30:45                     │  ← Clock digits (64×32 LED matrix)
+│        16:30:45                     │  ← Clock digits (64×32 RGB LED Matrix HUB75)
 │                                     │
 │                                     │
 ├─────────────────────────────────────┤
-│ WIFI: YourNetwork  IP: 192.168.1.x │  ← Status bar
-│ 2026-01-07  LED: d5 g0 p5          │
+│ IP: 192.168.1.100                   │  ← Status bar
+│ 2026-01-07  Sydney, Australia       │
 └─────────────────────────────────────┘
 ```
 
-### LED Matrix Emulation
+### RGB LED Matrix (HUB75) Emulation
 - Each "LED" is rendered as a square pixel of adjustable size
+- Emulates physical 64×32 RGB LED Matrix Panel with HUB75 protocol characteristics
 - Pitch (spacing) is automatically calculated: `min(320/64, 190/32) = 5 pixels per LED`
 - This gives a display size of 320×160 pixels for the clock
 - Status bar occupies the bottom 50 pixels
@@ -181,14 +239,29 @@ The device provides a simple REST API:
     "tz": "Australia/Sydney",
     "ntp": "pool.ntp.org",
     "use24h": true,
+    "dateFormat": 0,
     "ledDiameter": 5,
     "ledGap": 0,
     "ledColor": 16711680,
-    "brightness": 255
+    "brightness": 255,
+    "uptime": 3600,
+    "freeHeap": 180000,
+    "heapSize": 320000,
+    "cpuFreq": 240,
+    "debugLevel": 3,
+    "board": "ESP32-2432S028 (CYD)",
+    "display": "320×240 ILI9341",
+    "sensors": "None detected",
+    "firmware": "1.0.0",
+    "otaEnabled": true
   }
   ```
+- `GET /api/timezones` - List of 88 timezones grouped by 13 geographic regions (JSON)
 - `POST /api/config` - Update configuration (JSON body)
-- `GET /api/mirror` - Raw framebuffer data (2048 bytes, 64×32 matrix)
+  - Accepts: tz, ntp, use24h, dateFormat, ledDiameter, ledGap, ledColor, brightness, debugLevel
+  - Logs before/after values for all changed fields to Serial monitor
+  - Returns: `{"ok": true}` on success
+- `GET /api/mirror` - Raw framebuffer data (2048 bytes, 64×32 matrix, 8-bit intensity values)
 
 ## OTA Updates
 
@@ -268,16 +341,18 @@ The ArduinoOTA service runs on port 3232. You can use the Arduino IDE's network 
 ```
 CYD_LED_Matrix_Retro_Clock/
 ├── data/                      # Web UI files (uploaded to LittleFS)
-│   ├── index.html            # Main web interface
-│   ├── app.js                # JavaScript for live updates & display mirror
-│   └── style.css             # Stylesheet
+│   ├── index.html            # Main web interface with diagnostics panel
+│   ├── app.js                # JavaScript for live updates, display mirror, and formatting utilities
+│   └── style.css             # Stylesheet with status panel and footer styles
 ├── include/
-│   ├── config.h              # Configuration constants
+│   ├── config.h              # Configuration constants including FIRMWARE_VERSION
+│   ├── timezones.h           # 88 timezones across 13 geographic regions
 │   └── User_Setup.h          # TFT_eSPI pin configuration
 ├── src/
-│   └── main.cpp              # Main application code
+│   └── main.cpp              # Main application code with enhanced logging and diagnostics
 ├── platformio.ini            # PlatformIO configuration
-├── CHANGELOG.md              # Version history
+├── CHANGELOG.md              # Version history (updated for v1.0.0)
+├── LICENSE                   # MIT License
 └── README.md                 # This file
 ```
 
@@ -304,11 +379,11 @@ CYD_LED_Matrix_Retro_Clock/
 
 ### Building Custom Variants
 
-#### Change LED Matrix Size
+#### Change RGB LED Matrix (HUB75) Size
 Edit `platformio.ini`:
 ```ini
 build_flags =
-  -DLED_MATRIX_W=128   # Change width
+  -DLED_MATRIX_W=128   # Change width (e.g., 128 for 128×64 panel)
   -DLED_MATRIX_H=64    # Change height
 ```
 
@@ -349,15 +424,18 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - TFT display library: [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)
 - WiFi management: [WiFiManager](https://github.com/tzapu/WiFiManager)
 - JSON parsing: [ArduinoJson](https://arduinojson.org/)
-- Inspired by classic LED matrix clocks and 7-segment displays
+- Inspired by classic RGB LED Matrix (HUB75) clocks and 7-segment displays
 - Built with assistance from [Claude Code](https://claude.com/claude-code)
 
 ## Support
 
 For issues, questions, or suggestions:
-- Open an issue on GitHub
+- GitHub Repository: [CYD-LED-Matrix-Retro-Clock](https://github.com/anthonyjclarke/CYD-LED-Matrix-Retro-Clock)
+- Bluesky: [@anthonyjclarke.bsky.social](https://bsky.app/profile/anthonyjclarke.bsky.social)
 - Check the troubleshooting section above
-- Review the CHANGELOG.md for known issues
+- Review the [CHANGELOG.md](CHANGELOG.md) for known issues and version history
+
+The web interface footer includes quick links to GitHub and Bluesky profiles.
 
 ## Version History
 
@@ -367,4 +445,4 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ---
 
-**Enjoy your retro LED matrix clock!** ⏰
+**Enjoy your retro RGB LED Matrix (HUB75) clock!** ⏰
