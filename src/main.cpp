@@ -1,6 +1,6 @@
 /*
  * CYD RGB LED Matrix (HUB75) Retro Clock
- * Version: 1.0.0
+ * Version: See FIRMWARE_VERSION in include/config.h
  *
  * A retro-style RGB LED Matrix (HUB75) clock emulator for the ESP32-2432S028 (CYD - Cheap Yellow Display)
  *
@@ -51,8 +51,6 @@
  * - GET  /api/timezones - List of 88 global timezones grouped by region
  *
  * FUTURE ENHANCEMENTS:
- * - [ ] Add I2C sensor support (SHT30/BME280/HTU21D) for temperature & humidity
- * - [ ] Display temperature/humidity on screen and in web UI
  * - [ ] Multiple display modes (clock, date, temp, custom messages)
  * - [ ] Per-LED color control for RGB LED Matrix effects
  * - [ ] Touch screen support for direct configuration
@@ -62,8 +60,6 @@
  * - [ ] Home Assistant integration
  * - [ ] Web-based OTA upload interface
  * - [ ] Customizable animations and transition effects
- * - [ ] Multi-language support for web interface
- * - [ ] README.MD Display examples
  * - [ ] Touch panel diagnostic overlay on TFT display when touched
  *
  * Author: Built with the help of Claude Code
@@ -84,9 +80,21 @@
 
 #include <ArduinoOTA.h>
 #include <time.h>
+#include <Wire.h>
 
 #include "config.h"
 #include "timezones.h"
+
+// Sensor libraries (only one will be used based on config.h)
+#ifdef USE_BME280
+  #include <Adafruit_BME280.h>
+#endif
+#ifdef USE_SHT3X
+  #include <Adafruit_SHT31.h>
+#endif
+#ifdef USE_HTU21D
+  #include <Adafruit_HTU21DF.h>
+#endif
 
 // =========================
 // Debug System
@@ -151,6 +159,17 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 WebServer server(HTTP_PORT);
 Preferences prefs;
 
+// Sensor objects (only one will be initialized based on configuration)
+#ifdef USE_BME280
+  Adafruit_BME280 bme280;
+#endif
+#ifdef USE_SHT3X
+  Adafruit_SHT31 sht3x = Adafruit_SHT31();
+#endif
+#ifdef USE_HTU21D
+  Adafruit_HTU21DF htu21d = Adafruit_HTU21DF();
+#endif
+
 struct AppConfig {
   char tz[48]   = DEFAULT_TZ;
   char ntp[64]  = DEFAULT_NTP;
@@ -164,10 +183,21 @@ struct AppConfig {
   uint32_t ledColor = 0xFF0000; // red
   uint8_t brightness = 255;     // 0..255
 
-  bool flipDisplay = false;     // false=rotation 1 (normal), true=rotation 3 (180° flip)
+  bool flipDisplay = false;    // false=rotation 1 (IO ports top, USB left), true=rotation 3 (180° flip)
+
+  // Sensor settings
+  bool useFahrenheit = false;   // false=Celsius, true=Fahrenheit
 };
 
 AppConfig cfg;
+
+// Sensor state variables
+bool sensorAvailable = false;
+int temperature = 0;
+int humidity = 0;
+int pressure = 0;
+const char* sensorType = "NONE";  // Will be set based on detected sensor
+unsigned long lastSensorUpdate = 0;
 
 // Logical RGB LED Matrix (HUB75) framebuffer: 0..255 intensity
 static uint8_t fb[LED_MATRIX_H][LED_MATRIX_W];
@@ -181,6 +211,35 @@ static uint8_t appliedPitch = 0;
 // Sprite settings for flicker-free debug renderer
 static int fbPitch = 2;      // logical LED -> TFT pixels (computed from TFT size + config)
 static bool useSprite = false;
+
+// =========================
+// RGB LED Status Functions
+// =========================
+
+/**
+ * Set RGB LED state (CYD RGB LEDs are active LOW)
+ * @param red Red LED state (true = ON)
+ * @param green Green LED state (true = ON)
+ * @param blue Blue LED state (true = ON)
+ */
+static void setRGBLed(bool red, bool green, bool blue) {
+  digitalWrite(LED_R_PIN, red ? LOW : HIGH);
+  digitalWrite(LED_G_PIN, green ? LOW : HIGH);
+  digitalWrite(LED_B_PIN, blue ? LOW : HIGH);
+}
+
+/**
+ * Flash RGB LED with specified color
+ * @param r Red state (0 or 1)
+ * @param g Green state (0 or 1)
+ * @param b Blue state (0 or 1)
+ * @param delayMs Flash duration in milliseconds
+ */
+static void flashRGBLed(int r, int g, int b, int delayMs = 200) {
+  setRGBLed(r, g, b);
+  delay(delayMs);
+  setRGBLed(false, false, false);
+}
 
 // =========================
 // Utility Functions
@@ -496,13 +555,17 @@ static void drawStatusBar() {
   if (barY < 0) barY = tft.height();
 
   char line1[64];
-  if (WiFi.isConnected()) {
-    snprintf(line1, sizeof(line1), "IP: %s", WiFi.localIP().toString().c_str());
+  // Line 1: Temperature and Humidity
+  if (sensorAvailable) {
+    int displayTemp = cfg.useFahrenheit ? (temperature * 9 / 5 + 32) : temperature;
+    const char* tempUnit = cfg.useFahrenheit ? "oF" : "oC";  // Using 'o' as degree symbol
+    snprintf(line1, sizeof(line1), "Temp: %d%s  Humidity: %d%%", displayTemp, tempUnit, humidity);
   } else {
-    snprintf(line1, sizeof(line1), "IP: Not connected (AP mode)");
+    snprintf(line1, sizeof(line1), "Sensor: Not detected");
   }
 
   char line2[64];
+  // Line 2: Date and Timezone
   snprintf(line2, sizeof(line2), "%s  %s", currDate, cfg.tz);
 
   uint32_t now = millis();
@@ -641,6 +704,7 @@ static void loadConfig() {
   cfg.ledColor = prefs.getUInt("col", 0xFF0000);
   cfg.brightness = (uint8_t)prefs.getUChar("bl", 255);
   cfg.flipDisplay = prefs.getBool("flip", false);
+  cfg.useFahrenheit = prefs.getBool("useFahr", false);
   debugLevel = (uint8_t)prefs.getUChar("dbglvl", DEBUG_LEVEL);
 
   prefs.end();
@@ -652,6 +716,7 @@ static void loadConfig() {
   DBG("  Color: #%06X\n", (unsigned)cfg.ledColor);
   DBG("  Brightness: %u\n", cfg.brightness);
   DBG("  FlipDisplay: %s\n", cfg.flipDisplay ? "true" : "false");
+  DBG("  UseFahrenheit: %s\n", cfg.useFahrenheit ? "true" : "false");
   DBG("  DebugLevel: %u\n", debugLevel);
 
   DBG_OK("Config loaded.");
@@ -669,6 +734,7 @@ static void saveConfig() {
   prefs.putUInt("col", cfg.ledColor);
   prefs.putUChar("bl", cfg.brightness);
   prefs.putBool("flip", cfg.flipDisplay);
+  prefs.putBool("useFahr", cfg.useFahrenheit);
   prefs.putUChar("dbglvl", debugLevel);
   prefs.end();
   DBG_OK("Config saved.");
@@ -679,13 +745,167 @@ static void saveConfig() {
 // =========================
 /**
  * Apply display rotation based on flipDisplay setting
- * - rotation 1 (normal): USB port on left, buttons on right
- * - rotation 3 (flipped): USB port on right, buttons on left (180° rotation)
+ * - rotation 1 (normal): IO ports at top, USB on left
+ * - rotation 3 (flipped): IO ports at bottom, USB on right (180° rotation)
  */
 static void applyDisplayRotation() {
   uint8_t rotation = cfg.flipDisplay ? 3 : 1;
   tft.setRotation(rotation);
   DBG_VERBOSE("Display rotation set to %d (%s)\n", rotation, cfg.flipDisplay ? "flipped" : "normal");
+}
+
+// =========================
+// Sensor Functions
+// =========================
+/**
+ * Test and initialize I2C sensor
+ * @return true if sensor detected and working, false otherwise
+ */
+static bool testSensor() {
+  Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+  DBG_STEP("Testing I2C sensor...");
+
+#ifdef USE_BME280
+  // Test BME280 sensor
+  if (!bme280.begin(0x76, &Wire)) {
+    DBG_WARN("BME280 sensor not found at 0x76\n");
+    if (!bme280.begin(0x77, &Wire)) {
+      DBG_WARN("BME280 sensor not found at 0x77 either\n");
+      return false;
+    }
+  }
+
+  bme280.setSampling(Adafruit_BME280::MODE_FORCED,
+                     Adafruit_BME280::SAMPLING_X1,
+                     Adafruit_BME280::SAMPLING_X1,
+                     Adafruit_BME280::SAMPLING_X1,
+                     Adafruit_BME280::FILTER_OFF);
+
+  float temp = bme280.readTemperature();
+  float hum = bme280.readHumidity();
+
+  if (isnan(temp) || isnan(hum) || temp < -50 || temp > 100 || hum < 0 || hum > 100) {
+    DBG_WARN("BME280 readings invalid\n");
+    return false;
+  }
+
+  DBG_INFO("BME280 OK: %.1f°C, %.1f%%\n", temp, hum);
+  sensorType = "BME280";
+  return true;
+
+#elif defined(USE_SHT3X)
+  // Test SHT3X sensor
+  if (!sht3x.begin(0x44)) {  // Default I2C address for SHT3X
+    DBG_WARN("SHT3X sensor not found at 0x44\n");
+    if (!sht3x.begin(0x45)) {  // Alternative I2C address
+      DBG_WARN("SHT3X sensor not found at 0x45 either\n");
+      return false;
+    }
+  }
+
+  // Read initial values to verify sensor is working
+  float temp = sht3x.readTemperature();
+  float hum = sht3x.readHumidity();
+
+  if (isnan(temp) || isnan(hum) || temp < -50 || temp > 100 || hum < 0 || hum > 100) {
+    DBG_WARN("SHT3X readings invalid\n");
+    return false;
+  }
+
+  DBG_INFO("SHT3X OK: %.1f°C, %.1f%%\n", temp, hum);
+  sensorType = "SHT3X";
+  return true;
+
+#elif defined(USE_HTU21D)
+  // Test HTU21D sensor
+  if (!htu21d.begin()) {  // HTU21D uses fixed I2C address 0x40
+    DBG_WARN("HTU21D sensor not found at 0x40\n");
+    return false;
+  }
+
+  // Read initial values to verify sensor is working
+  float temp = htu21d.readTemperature();
+  float hum = htu21d.readHumidity();
+
+  if (isnan(temp) || isnan(hum) || temp < -50 || temp > 100 || hum < 0 || hum > 100) {
+    DBG_WARN("HTU21D readings invalid\n");
+    return false;
+  }
+
+  DBG_INFO("HTU21D OK: %.1f°C, %.1f%%\n", temp, hum);
+  sensorType = "HTU21D";
+  return true;
+
+#else
+  DBG_WARN("No sensor type defined in configuration\n");
+  return false;
+#endif
+}
+
+/**
+ * Update sensor readings from I2C sensor
+ */
+static void updateSensorData() {
+  if (!sensorAvailable) return;
+
+  float temp = NAN;
+  float hum = NAN;
+  float pres = NAN;
+
+#ifdef USE_BME280
+  // Read BME280 sensor
+  bme280.takeForcedMeasurement();
+  temp = bme280.readTemperature();
+  hum = bme280.readHumidity();
+  pres = bme280.readPressure() / 100.0F;
+
+#elif defined(USE_SHT3X)
+  // Read SHT3X sensor
+  temp = sht3x.readTemperature();
+  hum = sht3x.readHumidity();
+  // SHT3X doesn't have a pressure sensor, so pressure remains NAN
+
+#elif defined(USE_HTU21D)
+  // Read HTU21D sensor
+  temp = htu21d.readTemperature();
+  hum = htu21d.readHumidity();
+  // HTU21D doesn't have a pressure sensor, so pressure remains NAN
+#endif
+
+  // Update temperature if valid
+  if (!isnan(temp) && temp >= -50 && temp <= 100) {
+    temperature = (int)round(temp);
+  }
+
+  // Update humidity if valid
+  if (!isnan(hum) && hum >= 0 && hum <= 100) {
+    humidity = (int)round(hum);
+  }
+
+  // Update pressure if valid (only for BME280)
+  if (!isnan(pres) && pres >= 800 && pres <= 1200) {
+    pressure = (int)round(pres);
+  }
+
+  // Output sensor readings to serial (always at INFO level for visibility)
+  if (cfg.useFahrenheit) {
+    int tempF = temperature * 9 / 5 + 32;
+    DBG_INFO("Sensor Update - %s: %d°F (%d°C), Humidity: %d%%",
+             sensorType, tempF, temperature, humidity);
+  } else {
+    DBG_INFO("Sensor Update - %s: %d°C, Humidity: %d%%",
+             sensorType, temperature, humidity);
+  }
+
+#ifdef USE_BME280
+  if (pressure > 0) {
+    DBG_INFO(", Pressure: %d hPa\n", pressure);
+  } else {
+    DBG_INFO("\n");
+  }
+#else
+  DBG_INFO("\n");
+#endif
 }
 
 // =========================
@@ -717,6 +937,9 @@ static void startNtp() {
   DBG_INFO("Timezone: %s -> %s\n", cfg.tz, tzEnv);
   configTzTime(tzEnv, cfg.ntp);
   DBG_OK("NTP configured.");
+
+  // Green flash on successful NTP config
+  flashRGBLed(0, 1, 0);
 }
 
 static bool getLocalTimeSafe(struct tm& timeinfo, uint32_t timeoutMs = 2000) {
@@ -783,6 +1006,28 @@ static void handleGetTimezones() {
 }
 
 /**
+ * POST /api/reset-wifi
+ *
+ * Resets WiFi credentials and restarts the device into config portal mode.
+ * This allows users to reconfigure WiFi settings via the web interface.
+ */
+static void handleResetWiFi() {
+  String clientIP = server.client().remoteIP().toString();
+  DBG_INFO("Web: POST /api/reset-wifi from %s\n", clientIP.c_str());
+
+  server.send(200, "application/json", "{\"status\":\"WiFi reset initiated. Device will restart...\"}");
+
+  delay(1000);
+
+  DBG_OK("Resetting WiFi credentials via web interface...");
+  WiFiManager wm;
+  wm.resetSettings();
+
+  delay(1000);
+  ESP.restart();
+}
+
+/**
  * GET /api/state
  *
  * Returns comprehensive system state as JSON for web interface.
@@ -838,10 +1083,32 @@ static void handleGetState() {
   doc["cpuFreq"] = ESP.getCpuFreqMHz();
   doc["debugLevel"] = debugLevel;
 
+  // Sensor data
+  doc["sensorAvailable"] = sensorAvailable;
+  doc["sensorType"] = sensorType;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  doc["pressure"] = pressure;
+  doc["useFahrenheit"] = cfg.useFahrenheit;
+
   // Hardware info (static)
   doc["board"] = "ESP32-2432S028 (CYD)";
   doc["display"] = "320×240 ILI9341";
-  doc["sensors"] = "None detected";  // TODO: Update when sensors added
+
+  // Build sensor info string
+  String sensorInfo;
+  if (sensorAvailable) {
+    sensorInfo = String(sensorType);
+#ifdef USE_BME280
+    sensorInfo += " (Temp/Humid/Press)";
+#else
+    sensorInfo += " (Temp/Humid)";
+#endif
+  } else {
+    sensorInfo = "None detected";
+  }
+  doc["sensors"] = sensorInfo;
+
   doc["firmware"] = FIRMWARE_VERSION;
   doc["otaEnabled"] = true;
 
@@ -993,6 +1260,17 @@ static void handlePostConfig() {
     }
   }
 
+  // Temperature unit
+  if (!doc["useFahrenheit"].isNull()) {
+    bool oldUseFahrenheit = cfg.useFahrenheit;
+    cfg.useFahrenheit = doc["useFahrenheit"].as<bool>();
+    if (oldUseFahrenheit != cfg.useFahrenheit) {
+      DBG_INFO("  [%s] Temperature unit changed: %s -> %s\n", clientIP.c_str(),
+               oldUseFahrenheit ? "°F" : "°C",
+               cfg.useFahrenheit ? "°F" : "°C");
+    }
+  }
+
   // Constrain LED rendering parameters
   // ledDiameter: max size of each LED dot (pitch is typically 5 for 320x240)
   // ledGap: space between LEDs (gap + dot <= pitch)
@@ -1038,19 +1316,40 @@ static void serveStaticFiles() {
 // =========================
 // WiFi setup
 // =========================
+
+/**
+ * Callback when WiFiManager enters config portal mode
+ * Sets RGB LED to purple (red+blue) to indicate AP mode
+ */
+static void configModeCallback(WiFiManager* myWiFiManager) {
+  DBG_INFO("Entered WiFi config mode\n");
+  DBG("Connect to AP: %s\n", myWiFiManager->getConfigPortalSSID().c_str());
+  DBG("Config portal IP: %s\n", WiFi.softAPIP().toString().c_str());
+
+  // Set LED to purple (red+blue) for config mode
+  setRGBLed(1, 0, 1);
+}
+
 static void startWifi() {
   DBG_STEP("Starting WiFi (STA) + WiFiManager...");
   WiFi.mode(WIFI_STA);
 
+  // Blue LED during WiFi connection attempt
+  setRGBLed(0, 0, 1);
+
   WiFiManager wm;
   wm.setConfigPortalTimeout(180);
   wm.setConnectTimeout(20);
+  wm.setAPCallback(configModeCallback);  // Set callback for config portal
 
   bool ok = wm.autoConnect("CYD-RetroClock-Setup");
   if (!ok) {
     DBG_WARN("WiFiManager autoConnect failed/timeout. Starting fallback AP...");
     WiFi.mode(WIFI_AP);
     WiFi.softAP("CYD-RetroClock-AP");
+    // Red LED for failed connection
+    setRGBLed(1, 0, 0);
+    delay(1000);
   }
 
   if (WiFi.isConnected()) {
@@ -1058,23 +1357,142 @@ static void startWifi() {
         WiFi.SSID().c_str(),
         WiFi.localIP().toString().c_str());
     DBG_OK("WiFi ready.");
+    // Green flash for successful connection
+    flashRGBLed(0, 1, 0, 500);
   } else {
     DBG_WARN("WiFi not connected (AP mode).");
+    setRGBLed(false, false, false);
   }
 }
 
 // =========================
 // OTA
 // =========================
+
+/**
+ * Draw OTA progress bar on TFT display
+ * @param progress Progress percentage (0-100)
+ */
+static void drawOTAProgress(unsigned int progress) {
+  const int barWidth = 280;
+  const int barHeight = 40;
+  const int barX = (tft.width() - barWidth) / 2;
+  const int barY = (tft.height() - barHeight) / 2;
+
+  // Clear screen on first progress update
+  static bool firstDraw = true;
+  if (firstDraw) {
+    tft.fillScreen(TFT_BLACK);
+    firstDraw = false;
+  }
+
+  // Draw title
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  tft.setTextFont(4);
+  tft.drawString("OTA Update", tft.width() / 2, barY - 50);
+
+  // Draw progress bar border
+  tft.drawRect(barX - 2, barY - 2, barWidth + 4, barHeight + 4, TFT_WHITE);
+
+  // Fill progress bar
+  int fillWidth = (barWidth * progress) / 100;
+  if (fillWidth > 0) {
+    // Use gradient colors: red -> yellow -> green
+    uint16_t barColor;
+    if (progress < 33) {
+      barColor = TFT_RED;
+    } else if (progress < 66) {
+      barColor = TFT_YELLOW;
+    } else {
+      barColor = TFT_GREEN;
+    }
+    tft.fillRect(barX, barY, fillWidth, barHeight, barColor);
+  }
+
+  // Clear remaining area
+  if (fillWidth < barWidth) {
+    tft.fillRect(barX + fillWidth, barY, barWidth - fillWidth, barHeight, TFT_BLACK);
+  }
+
+  // Draw percentage text
+  char progressText[8];
+  snprintf(progressText, sizeof(progressText), "%u%%", progress);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextFont(4);
+  tft.drawString(progressText, tft.width() / 2, barY + barHeight / 2);
+
+  // Draw size info below bar
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.drawString("Please wait...", tft.width() / 2, barY + barHeight + 20);
+}
+
 static void startOta() {
   DBG_STEP("Starting OTA...");
   ArduinoOTA.setHostname(OTA_HOSTNAME);
   ArduinoOTA.setPassword(OTA_PASSWORD);
 
-  ArduinoOTA.onStart([]() { DBG_INFO("OTA update started\n"); });
-  ArduinoOTA.onEnd([]() { DBG_INFO("OTA update completed\n"); });
+  ArduinoOTA.onStart([]() {
+    DBG_INFO("OTA update started\n");
+    // Set RGB LED to cyan (blue+green) during OTA
+    setRGBLed(0, 1, 1);
+    // Clear screen for progress bar
+    tft.fillScreen(TFT_BLACK);
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    unsigned int percent = (progress * 100) / total;
+    DBG_VERBOSE("OTA Progress: %u%% (%u/%u bytes)\n", percent, progress, total);
+    drawOTAProgress(percent);
+  });
+
+  ArduinoOTA.onEnd([]() {
+    DBG_INFO("OTA update completed\n");
+    // Display completion message
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextFont(4);
+    tft.drawString("Update Complete!", tft.width() / 2, tft.height() / 2 - 20);
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString("Restarting...", tft.width() / 2, tft.height() / 2 + 20);
+    // Green flash for successful update
+    flashRGBLed(0, 1, 0, 1000);
+  });
+
   ArduinoOTA.onError([](ota_error_t error) {
     DBG_ERROR("OTA update failed: error code %u\n", (unsigned)error);
+    // Display error message
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.setTextFont(4);
+    tft.drawString("Update Failed!", tft.width() / 2, tft.height() / 2 - 20);
+
+    // Show error details
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    const char* errorMsg = "Unknown error";
+    switch (error) {
+      case OTA_AUTH_ERROR: errorMsg = "Auth Failed"; break;
+      case OTA_BEGIN_ERROR: errorMsg = "Begin Failed"; break;
+      case OTA_CONNECT_ERROR: errorMsg = "Connect Failed"; break;
+      case OTA_RECEIVE_ERROR: errorMsg = "Receive Failed"; break;
+      case OTA_END_ERROR: errorMsg = "End Failed"; break;
+    }
+    tft.drawString(errorMsg, tft.width() / 2, tft.height() / 2 + 20);
+
+    // Red LED for error
+    setRGBLed(1, 0, 0);
+    delay(3000);
+    setRGBLed(false, false, false);
+
+    // Return to normal display after 3 seconds
+    tft.fillScreen(TFT_BLACK);
   });
 
   ArduinoOTA.begin();
@@ -1289,8 +1707,53 @@ void setup() {
   DBG("LED grid: %dx%d (fb size: %u bytes)\n", LED_MATRIX_W, LED_MATRIX_H, (unsigned)sizeof(fb));
   DBG("TFT_eSPI version check...\n");
 
+  // Initialize RGB LED pins
+  pinMode(LED_R_PIN, OUTPUT);
+  pinMode(LED_G_PIN, OUTPUT);
+  pinMode(LED_B_PIN, OUTPUT);
+  setRGBLed(false, false, false);  // All off initially
+  DBG_OK("RGB LED initialized.");
+
+  // Initialize boot button
+  pinMode(BOOT_BTN_PIN, INPUT_PULLUP);
+
+  // Check if BOOT button is pressed during startup to reset WiFi
+  bool resetWiFi = false;
+  if (digitalRead(BOOT_BTN_PIN) == LOW) {
+    DBG_INFO("BOOT button pressed - checking for WiFi reset...\n");
+    setRGBLed(1, 1, 0);  // Yellow LED to indicate button detected
+
+    // Wait for button to be held for 3 seconds
+    unsigned long pressStart = millis();
+    while (digitalRead(BOOT_BTN_PIN) == LOW && (millis() - pressStart) < 3000) {
+      delay(100);
+    }
+
+    if (millis() - pressStart >= 3000) {
+      resetWiFi = true;
+      DBG_OK("BOOT button held for 3 seconds - WiFi will be reset!");
+      setRGBLed(1, 0, 0);  // Red LED
+      delay(500);
+    } else {
+      DBG_INFO("Button released too early - WiFi will not be reset\n");
+      setRGBLed(false, false, false);
+    }
+  }
+
+  // Flash blue to indicate startup
+  flashRGBLed(0, 0, 1, 500);
+
   initBitmaps();
   loadConfig();
+
+  // Reset WiFi if button was held during boot
+  if (resetWiFi) {
+    DBG_INFO("Resetting WiFi credentials...\n");
+    WiFiManager wm;
+    wm.resetSettings();
+    delay(1000);
+    DBG_OK("WiFi credentials cleared!");
+  }
 
   DBG_STEP("Mounting LittleFS...");
   if (!LittleFS.begin(true)) {
@@ -1330,6 +1793,20 @@ void setup() {
   // WiFi
   startWifi();
 
+  // Sensor
+  sensorAvailable = testSensor();
+  if (sensorAvailable) {
+    updateSensorData();
+    lastSensorUpdate = millis();
+    DBG_OK("Sensor initialized and reading.");
+    // Green flash for sensor found
+    flashRGBLed(0, 1, 0);
+  } else {
+    DBG_WARN("No sensor detected. Temperature/humidity features disabled.");
+    // Yellow flash (red+green) for no sensor
+    flashRGBLed(1, 1, 0);
+  }
+
   // NTP
   startNtp();
 
@@ -1343,6 +1820,7 @@ void setup() {
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/mirror", HTTP_GET, handleGetMirror);
   server.on("/api/timezones", HTTP_GET, handleGetTimezones);
+  server.on("/api/reset-wifi", HTTP_POST, handleResetWiFi);
   server.begin();
   DBG_OK("WebServer ready.");
 
@@ -1355,8 +1833,14 @@ void loop() {
 
   updateClockLogic();
 
-  static uint32_t lastFrame = 0;
+  // Update sensor data periodically
   uint32_t now = millis();
+  if (sensorAvailable && (now - lastSensorUpdate >= SENSOR_UPDATE_INTERVAL)) {
+    updateSensorData();
+    lastSensorUpdate = now;
+  }
+
+  static uint32_t lastFrame = 0;
   if (now - lastFrame >= FRAME_MS) {
     lastFrame = now;
     drawFrame();

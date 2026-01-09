@@ -68,6 +68,12 @@
             <option value="4">Mon DD, YYYY</option>
           </select>
         </label>
+        <label>Temperature unit
+          <select id="useFahrenheit">
+            <option value="false">Celsius (°C)</option>
+            <option value="true">Fahrenheit (°F)</option>
+          </select>
+        </label>
 
         <label>LED diameter (px)
           <input id="ledd" type="number" min="1" max="10">
@@ -82,9 +88,12 @@
           <input id="bl" type="number" min="0" max="255">
         </label>
 
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #1b2330;">
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #1b2330; display: flex; flex-direction: column; gap: 8px;">
           <button id="flipBtn" style="width: 100%; padding: 10px; font-size: 14px; background: #1a3a52; border: 1px solid #2a5a82; color: #8ef1ff; cursor: pointer; border-radius: 6px; transition: all 0.2s;">
             🔄 Flip Display
+          </button>
+          <button id="resetWifiBtn" style="width: 100%; padding: 10px; font-size: 14px; background: #521a1a; border: 1px solid #822a2a; color: #ffb3b3; cursor: pointer; border-radius: 6px; transition: all 0.2s;">
+            📶 Reset WiFi
           </button>
         </div>
       </div>
@@ -102,6 +111,13 @@
           <div class="status-item"><span class="k">Date</span> <span id="date">----</span></div>
           <div class="status-item"><span class="k">WiFi</span> <span id="wifi">--</span></div>
           <div class="status-item"><span class="k">IP Address</span> <span id="ip">--</span></div>
+        </div>
+
+        <div class="status-section">
+          <h3>Environment</h3>
+          <div class="status-item"><span class="k">Temperature</span> <span id="temperature">--</span></div>
+          <div class="status-item"><span class="k">Humidity</span> <span id="humidity">--</span></div>
+          <div class="status-item"><span class="k">Sensor</span> <span id="sensorType">--</span></div>
         </div>
 
         <div class="status-section">

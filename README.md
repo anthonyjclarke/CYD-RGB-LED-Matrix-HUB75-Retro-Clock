@@ -1,12 +1,17 @@
 # CYD RGB LED Matrix (HUB75) Retro Clock
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+<!-- Note: Update version badge below when FIRMWARE_VERSION changes in include/config.h -->
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-ESP32-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![LED Type](https://img.shields.io/badge/LED-HUB75%20RGB-red.svg)
 
 
-A retro-style RGB LED Matrix (HUB75) clock for the ESP32-2432S028 (CYD - Cheap Yellow Display) that emulates a **64×32 RGB LED Matrix Panel (HUB75)** on a 320×240 TFT display. Features large 7-segment digits with smooth morphing animations, WiFi connectivity, NTP time synchronization, and a web-based configuration interface.
+A retro-style RGB LED Matrix (HUB75) clock for the ESP32-2432S028 (CYD - Cheap Yellow Display) that emulates a **64×32 RGB LED Matrix Panel (HUB75)** on a 320×240 TFT display. Features large 7-segment digits with smooth morphing animations, WiFi connectivity, NTP time synchronization, and a web-based configuration interface. 
+
+![LED Panel Example](images/LEDMatrix_example.jpg)
+
+
 
 ![Clock Display](images/Display1_anim.gif)
 
@@ -23,6 +28,9 @@ A retro-style RGB LED Matrix (HUB75) clock for the ESP32-2432S028 (CYD - Cheap Y
 
 ### Connectivity
 - **WiFiManager** for easy WiFi setup (AP mode fallback)
+- **WiFi reset** via BOOT button (3-second hold during power-up)
+- **Web interface WiFi reset** option for remote WiFi reconfiguration
+- **RGB LED status indicators** for visual feedback during startup and operation
 - **NTP time synchronization** with IANA timezone support
 - **Web-based configuration** interface accessible from any browser
 - **OTA firmware updates** for easy maintenance
@@ -62,8 +70,9 @@ The CYD is an affordable ESP32 development board with integrated:
 - Extended GPIO connector
 
 ### Pin Configuration
-The project uses the standard CYD pin configuration (defined in `include/User_Setup.h`):
+The project uses the standard CYD pin configuration:
 
+**TFT Display Pins** (defined in `include/User_Setup.h`):
 ```cpp
 TFT_MISO   12
 TFT_MOSI   13
@@ -72,6 +81,14 @@ TFT_CS     15
 TFT_DC      2
 TFT_RST    -1  // Connected to ESP32 RST
 TFT_BL     21  // Backlight control
+```
+
+**RGB LED and Button Pins** (defined in `include/config.h`):
+```cpp
+LED_R_PIN      4   // Red LED (active LOW)
+LED_G_PIN     16   // Green LED (active LOW)
+LED_B_PIN     17   // Blue LED (active LOW)
+BOOT_BTN_PIN   0   // Boot button for WiFi reset (active LOW)
 ```
 
 ### Purchase Links
@@ -123,6 +140,13 @@ On first boot, the device will create a WiFi access point:
 6. Select your WiFi network and enter the password
 7. Click "Save"
 8. The device will restart and connect to your WiFi
+
+**WiFi Reset Options:**
+- **BOOT Button Reset**: Hold the BOOT button (GPIO 0) for 3 seconds during power-up to reset WiFi credentials
+  - Yellow LED: Button detected
+  - Red LED: Reset confirmed (release button)
+  - Device will restart in AP mode for reconfiguration
+- **Web Interface Reset**: Use the `/api/reset-wifi` endpoint to reset WiFi remotely (see API section)
 
 #### 7. Access the Web Interface
 1. Check your router for the device's IP address, or
@@ -225,6 +249,20 @@ Edit `include/config.h`:
 - This gives a display size of 320×160 pixels for the clock
 - Status bar occupies the bottom 50 pixels
 
+### RGB LED Status Indicators
+The CYD board's built-in RGB LED provides visual feedback during startup and operation:
+
+| Color | Meaning |
+|-------|---------|
+| **Blue** | Device starting up / Connecting to WiFi |
+| **Green Flash** | WiFi connected successfully / Sensor detected / NTP configured |
+| **Yellow** | BOOT button pressed during startup |
+| **Yellow Flash** | No sensor detected (normal if no sensor installed) |
+| **Red** | WiFi reset confirmed / WiFi connection failed |
+| **Purple** | WiFi config portal active (AP mode) |
+
+The RGB LED will turn off once the device is fully operational.
+
 ### API Endpoints
 The device provides a simple REST API:
 
@@ -252,7 +290,7 @@ The device provides a simple REST API:
     "board": "ESP32-2432S028 (CYD)",
     "display": "320×240 ILI9341",
     "sensors": "None detected",
-    "firmware": "1.0.0",
+    "firmware": "<FIRMWARE_VERSION from config.h>",
     "otaEnabled": true
   }
   ```
@@ -261,6 +299,9 @@ The device provides a simple REST API:
   - Accepts: tz, ntp, use24h, dateFormat, ledDiameter, ledGap, ledColor, brightness, debugLevel
   - Logs before/after values for all changed fields to Serial monitor
   - Returns: `{"ok": true}` on success
+- `POST /api/reset-wifi` - Reset WiFi credentials and restart device in AP mode
+  - Returns: `{"status": "WiFi reset initiated. Device will restart..."}` on success
+  - Device will restart and enter WiFi configuration mode
 - `GET /api/mirror` - Raw framebuffer data (2048 bytes, 64×32 matrix, 8-bit intensity values)
 
 ## OTA Updates
@@ -304,7 +345,10 @@ The ArduinoOTA service runs on port 3232. You can use the Arduino IDE's network 
 - **Solution**:
   - Verify password is correct
   - Check that your network is 2.4GHz (ESP32 doesn't support 5GHz)
-  - Try using WiFiManager to clear saved credentials and reconfigure
+  - Reset WiFi credentials using one of these methods:
+    - Hold BOOT button for 3 seconds during power-up (yellow → red LED)
+    - Send POST request to `/api/reset-wifi` from web interface
+  - Device will restart in AP mode for reconfiguration
 
 ### Time Issues
 
@@ -403,10 +447,8 @@ Edit `include/User_Setup.h`:
 ## Future Enhancements
 
 See `CHANGELOG.md` for planned features:
-- Temperature/humidity sensor support
 - Additional display modes (date, temperature, messages)
 - Color schemes and themes
-- Alarm functionality
 - Touch screen support
 - MQTT integration
 
@@ -430,7 +472,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 For issues, questions, or suggestions:
-- GitHub Repository: [CYD-LED-Matrix-Retro-Clock](https://github.com/anthonyjclarke/CYD-LED-Matrix-Retro-Clock)
+- GitHub Repository: [CYD-RGB-LED-Matrix-HUB75-Retro-Clock](https://github.com/anthonyjclarke/CYD-RGB-LED-Matrix-HUB75-Retro-Clock)
 - Bluesky: [@anthonyjclarke.bsky.social](https://bsky.app/profile/anthonyjclarke.bsky.social)
 - Check the troubleshooting section above
 - Review the [CHANGELOG.md](CHANGELOG.md) for known issues and version history
@@ -441,7 +483,7 @@ The web interface footer includes quick links to GitHub and Bluesky profiles.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-**Current Version**: 1.0.0 (2026-01-07)
+**Current Version**: Defined in [`include/config.h`](include/config.h) as `FIRMWARE_VERSION`
 
 ---
 

@@ -109,6 +109,25 @@ async function setControls(state) {
   $("wifi").textContent = state.wifi;
   $("ip").textContent = state.ip;
 
+  // Environment (Sensor Data)
+  if (state.sensorAvailable) {
+    const tempUnit = state.useFahrenheit ? "°F" : "°C";
+    let temp = state.temperature;
+
+    // Convert to Fahrenheit if needed
+    if (state.useFahrenheit) {
+      temp = Math.round(temp * 9 / 5 + 32);
+    }
+
+    $("temperature").textContent = `${temp}${tempUnit}`;
+    $("humidity").textContent = `${state.humidity}%`;
+    $("sensorType").textContent = state.sensorType || "Unknown";
+  } else {
+    $("temperature").textContent = "No sensor";
+    $("humidity").textContent = "--";
+    $("sensorType").textContent = "Not detected";
+  }
+
   // Hardware (static, but included for completeness)
   if (state.board) $("board").textContent = state.board;
   if (state.display) $("display").textContent = state.display;
@@ -149,6 +168,7 @@ async function setControls(state) {
   if (document.activeElement !== $("ntp")) $("ntp").value = state.ntp || "";
   if (document.activeElement !== $("use24h")) $("use24h").value = String(state.use24h);
   if (document.activeElement !== $("dateFormat")) $("dateFormat").value = String(state.dateFormat || 0);
+  if (document.activeElement !== $("useFahrenheit")) $("useFahrenheit").value = String(state.useFahrenheit || false);
 
   if (!dirtyInputs.has("ledd")) $("ledd").value = state.ledDiameter;
   if (!dirtyInputs.has("ledg")) $("ledg").value = state.ledGap;
@@ -179,6 +199,7 @@ async function saveConfig() {
   const ntp = $("ntp").value.trim() || state.ntp;
   const use24h = $("use24h").value === "true";
   const dateFormat = parseInt($("dateFormat").value, 10) || 0;
+  const useFahrenheit = $("useFahrenheit").value === "true";
 
   const ledDiameterRaw = parseInt($("ledd").value, 10);
   const ledGapRaw = parseInt($("ledg").value, 10);
@@ -190,7 +211,7 @@ async function saveConfig() {
 
   const ledDiameter = Number.isFinite(ledDiameterRaw) ? ledDiameterRaw : state.ledDiameter;
   const ledGap = Number.isFinite(ledGapRaw) ? ledGapRaw : state.ledGap;
-  const payload = { tz, ntp, use24h, dateFormat, ledDiameter, ledGap, ledColor, brightness, debugLevel };
+  const payload = { tz, ntp, use24h, dateFormat, useFahrenheit, ledDiameter, ledGap, ledColor, brightness, debugLevel };
 
   const res = await fetch("/api/config", {
     method: "POST",
@@ -235,6 +256,36 @@ $("flipBtn").addEventListener("click", async () => {
   }
 });
 
+// Reset WiFi button handler
+$("resetWifiBtn").addEventListener("click", async () => {
+  if (!confirm("Reset WiFi credentials? Device will restart in AP mode for reconfiguration.")) {
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/reset-wifi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+
+    if (!res.ok) {
+      setMsg("WiFi reset failed: " + (await res.text()), false);
+      return;
+    }
+
+    const data = await res.json();
+    setMsg(data.status || "WiFi reset initiated. Device restarting...");
+
+    // Show a message about reconnecting
+    setTimeout(() => {
+      setMsg("Device restarting... Connect to CYD-RetroClock-Setup AP to reconfigure WiFi.");
+    }, 2000);
+  } catch (e) {
+    // Device likely restarted, which is expected
+    setMsg("WiFi reset sent. Device restarting in AP mode...");
+  }
+});
+
 function renderMirror(buf, state) {
   // IMPORTANT: This must exactly match the TFT rendering logic in main.cpp:394-475
   // The TFT uses cfg.ledDiameter and cfg.ledGap to determine dot size and spacing
@@ -255,14 +306,6 @@ function renderMirror(buf, state) {
   if (canvas.width !== TFT_W || canvas.height !== TFT_H) {
     canvas.width = TFT_W;
     canvas.height = TFT_H;
-  }
-
-  // Apply display flip transform if needed
-  ctx.save();  // Save current context state
-  if (state.flipDisplay) {
-    // Rotate 180° around center for flipped display
-    ctx.translate(TFT_W, TFT_H);
-    ctx.rotate(Math.PI);
   }
 
   // Match the TFT rendering logic exactly (main.cpp:405-419)
@@ -329,24 +372,29 @@ function renderMirror(buf, state) {
       ctx.lineTo(TFT_W, barY + 0.5);
       ctx.stroke();
 
-      const ipStatus = state.wifi && state.wifi !== "DISCONNECTED"
-        ? `IP: ${state.ip}`
-        : "IP: Not connected (AP mode)";
+      // Line 1: Temperature and Humidity (matching TFT display)
+      let sensorLine;
+      if (state.sensorAvailable) {
+        const displayTemp = state.useFahrenheit
+          ? Math.round(state.temperature * 9 / 5 + 32)
+          : state.temperature;
+        const tempUnit = state.useFahrenheit ? '°F' : '°C';
+        sensorLine = `Temp: ${displayTemp}${tempUnit}  Humidity: ${state.humidity}%`;
+      } else {
+        sensorLine = "Sensor: Not detected";
+      }
       ctx.fillStyle = "#8ef1ff";
       ctx.font = "14px monospace";
       ctx.textBaseline = "top";
-      ctx.fillText(ipStatus, 6, barY + 6);
+      ctx.fillText(sensorLine, 6, barY + 6);
       ctx.fillStyle = "#c8d6e6";
       ctx.fillText(`${state.date}  ${state.tz}`, 6, barY + 26);
     }
   }
-
-  // Restore context state (removes flip transform if applied)
-  ctx.restore();
 }
 
 // Auto-apply on any config field change (instant feedback)
-["tz", "ntp", "use24h", "dateFormat", "ledd", "ledg", "col", "bl", "debugLevel"].forEach((id) => {
+["tz", "ntp", "use24h", "dateFormat", "useFahrenheit", "ledd", "ledg", "col", "bl", "debugLevel"].forEach((id) => {
   const el = $(id);
 
   // Immediate save on change for dropdowns and text inputs

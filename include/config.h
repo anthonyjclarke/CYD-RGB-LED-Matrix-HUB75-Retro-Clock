@@ -6,7 +6,7 @@
 // -----------------------------
 
 // ===== FIRMWARE VERSION =====
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.2.0"
 
 // ===== LED MATRIX EMULATION =====
 // Logical LED grid (single 64x32 panel)
@@ -34,9 +34,31 @@
 #define DEFAULT_NTP "pool.ntp.org"
 #define DEFAULT_24H true
 
-// ===== SENSOR (future) =====
-// We'll add SHT30/BME280/HTU21D later (I2C).
+// ===== SENSOR CONFIGURATION =====
+// Choose your sensor type by uncommenting ONE of the following:
+// #define USE_BME280        // BME280: Temperature, Humidity, Pressure sensor
+// #define USE_SHT3X         // SHT3X: Temperature and Humidity sensor (no pressure)
+#define USE_HTU21D           // HTU21D: Temperature and Humidity sensor (no pressure) - DEFAULT
+
+// I2C pins for sensor (using extended GPIO connector CN1)
+#define SENSOR_SDA_PIN    27    // I2C Data
+#define SENSOR_SCL_PIN    22    // I2C Clock
+
+// Sensor update interval
+#define SENSOR_UPDATE_INTERVAL 60000  // Update sensor every 60 seconds
+
+// Temperature unit
 #define DEFAULT_TEMP_C true
+
+// ===== RGB LED STATUS INDICATOR =====
+// CYD board has built-in RGB LED (active LOW)
+#define LED_R_PIN      4    // Red LED
+#define LED_G_PIN     16    // Green LED
+#define LED_B_PIN     17    // Blue LED
+
+// ===== BOOT BUTTON =====
+// Boot button for WiFi reset (active LOW)
+#define BOOT_BTN_PIN   0    // Boot button (built-in on CYD)
 
 // ===== OTA =====
 #define OTA_HOSTNAME "CYD-RetroClock"
