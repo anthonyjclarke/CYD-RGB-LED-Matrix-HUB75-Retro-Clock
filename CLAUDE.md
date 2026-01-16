@@ -1,4 +1,4 @@
-# Project: CYD RGB LED Matrix HUB75 Retro Clock
+# Project: CYD RGB LED Matrix HUB75 Retro Clock 16-1-2025
 
 ## Overview
 A retro-style RGB LED Matrix (HUB75) clock emulator for the ESP32-2432S028 (CYD) that renders a virtual 64×32 LED matrix panel on a 320×240 TFT display. Features large 7-segment digits with smooth morphing animations, WiFi connectivity with captive portal setup, NTP time synchronization across 88 global timezones, optional I2C sensor support (BME280/SHT3X/HTU21D), and a web-based configuration interface with live display mirroring. All settings persist to NVS with instant auto-apply and comprehensive system diagnostics.
