@@ -888,24 +888,23 @@ static void updateSensorData() {
   }
 
   // Output sensor readings to serial (always at INFO level for visibility)
-  if (cfg.useFahrenheit) {
-    int tempF = temperature * 9 / 5 + 32;
-    DBG_INFO("Sensor Update - %s: %d°F (%d°C), Humidity: %d%%",
-             sensorType, tempF, temperature, humidity);
-  } else {
-    DBG_INFO("Sensor Update - %s: %d°C, Humidity: %d%%",
-             sensorType, temperature, humidity);
-  }
+  if (sensorAvailable && debugLevel >= DBG_LEVEL_INFO) {
+    int displayTemp = cfg.useFahrenheit ? (temperature * 9 / 5 + 32) : temperature;
+    const char* unit = cfg.useFahrenheit ? "F" : "C";
 
 #ifdef USE_BME280
-  if (pressure > 0) {
-    DBG_INFO(", Pressure: %d hPa\n", pressure);
-  } else {
-    DBG_INFO("\n");
-  }
+    if (pressure > 0) {
+      DBG_INFO("Sensor Update - %s: %d°%s, Humidity: %d%%, Pressure: %d hPa\n",
+               sensorType, displayTemp, unit, humidity, pressure);
+    } else {
+      DBG_INFO("Sensor Update - %s: %d°%s, Humidity: %d%%\n",
+               sensorType, displayTemp, unit, humidity);
+    }
 #else
-  DBG_INFO("\n");
+    DBG_INFO("Sensor Update - %s: %d°%s, Humidity: %d%%\n",
+             sensorType, displayTemp, unit, humidity);
 #endif
+  }
 }
 
 // =========================
@@ -1554,7 +1553,13 @@ static void updateClockLogic() {
     memcpy(prevT, currT, 7);
     memcpy(currT, t6, 7);
     morphStep = 0;
-    DBG("[TIME] %.2s:%.2s:%.2s\n", currT, currT+2, currT+4);
+    if (cfg.use24h) {
+      DBG("[TIME] %.2s:%.2s:%.2s\n", currT, currT+2, currT+4);
+    } else {
+      char ampm[3];
+      strftime(ampm, sizeof(ampm), "%p", &ti);
+      DBG("[TIME] %.2s:%.2s:%.2s %s\n", currT, currT+2, currT+4, ampm);
+    }
   }
 }
 
@@ -1703,6 +1708,7 @@ void setup() {
   DBGLN(" CYD RGB LED Matrix (HUB75) Retro Clock - DEBUG BOOT");
   DBGLN("========================================");
 
+  DBG("Version: %s\n", FIRMWARE_VERSION);
   DBG("Build: %s %s\n", __DATE__, __TIME__);
   DBG("LED grid: %dx%d (fb size: %u bytes)\n", LED_MATRIX_W, LED_MATRIX_H, (unsigned)sizeof(fb));
   DBG("TFT_eSPI version check...\n");

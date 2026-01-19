@@ -5,6 +5,94 @@ All notable changes to the CYD LED Matrix Retro Clock project will be documented
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Planned Features
+
+- Take functions from https://github.com/anthonyjclarke/ESP32_Touchdown_Retro_Clock and incorporate into this clock.
+- Additional display modes (date, temperature, custom messages)
+- Multiple color schemes and themes
+- Alarm functionality
+- Touch screen support for direct configuration
+- MQTT integration for remote control
+- Automatic brightness adjustment based on ambient light
+
+## [1.2.0] - Work In Progress
+
+### Added
+- **Serial Boot Version Display**: Firmware version is now displayed in the serial output during bootup for easier identification and troubleshooting.
+- **Enhanced Serial Time Logging**: Serial time output now includes AM/PM indicators when 12-hour format is selected.
+- **OTA Progress Visualization**: Visual feedback during Over-The-Air firmware updates
+  - Animated progress bar on TFT display showing upload percentage (0-100%)
+  - Color-coded progress: Red (0-33%), Yellow (33-66%), Green (66-100%)
+  - Real-time percentage display centered on progress bar
+  - Cyan RGB LED indicator during OTA update process
+  - Success screen with "Update Complete!" message and green LED flash
+  - Error handling with detailed error messages on TFT display:
+    - Auth Failed, Begin Failed, Connect Failed, Receive Failed, End Failed
+  - Red LED indicator for failed updates with 3-second error display
+  - Automatic screen clear and return to normal operation after update or error
+
+### Technical Details
+- OTA progress callback updates display in real-time during firmware upload
+- Progress bar dimensions: 280×40 pixels, centered on 320×240 display
+- Uses TFT_eSPI Font 4 for title and percentage text, Font 2 for status message
+- Static `firstDraw` flag ensures screen clears only once at start of update
+- Error messages use detailed switch-case for all ArduinoOTA error types
+
+## [1.1.0] - 2026-01-08
+
+### Added
+- **WiFi Reset via BOOT Button**: Hold BOOT button (GPIO 0) for 3 seconds during power-up to reset WiFi credentials
+  - Yellow LED indicates button detection
+  - Red LED confirms reset after 3-second hold
+  - Device automatically restarts in AP mode for reconfiguration
+- **Web Interface WiFi Reset**: New `/api/reset-wifi` endpoint for remote WiFi credential reset
+  - Returns JSON status message
+  - Automatically restarts device in AP mode after reset
+- **RGB LED Status Indicators**: Comprehensive visual feedback system using CYD's built-in RGB LED
+  - Blue: Device starting up / Connecting to WiFi
+  - Green flash: WiFi connected / Sensor detected / NTP configured
+  - Yellow: BOOT button detected during startup
+  - Yellow flash: No sensor detected (normal operation)
+  - Red: WiFi reset confirmed / WiFi connection failed
+  - Purple: WiFi config portal active (AP mode)
+  - LED turns off when device is fully operational
+- **WiFiManager Callback Integration**: Config portal mode triggers purple LED indicator
+- **RGB LED Helper Functions**: `setRGBLed()` and `flashRGBLed()` for easy status control
+
+### Changed
+- **Display Mirror in Web UI**: Now shows temperature and humidity instead of IP address
+  - Exactly matches the physical TFT display layout
+  - Includes temperature unit conversion (Celsius/Fahrenheit)
+  - Shows "Sensor: Not detected" when no sensor is present
+- **Web UI Display Mirror Flip Removed**: Display mirror always shows upright orientation in browser
+  - Physical device flip setting no longer affects web UI mirror orientation
+  - Improves user experience for web-based monitoring
+- **Default Display Orientation**: Rotation defaults to IO ports at top, USB on left
+  - Rotation 1 (normal): IO ports top, USB left
+  - Rotation 3 (flipped): IO ports bottom, USB right
+  - Flip setting properly stored in configuration
+
+### Fixed
+- Display orientation now correctly defaults to IO ports at top, USB on left
+- Web UI display mirror no longer flips when device flip setting is toggled
+
+### Documentation
+- Updated README.md with WiFi reset procedures (BOOT button and web interface)
+- Added RGB LED status indicator reference table to README.md
+- Updated API documentation with `/api/reset-wifi` endpoint
+- Added pin configuration for RGB LED and BOOT button
+- Enhanced troubleshooting section with WiFi reset instructions
+- Updated version badge to 1.1.0
+
+### Technical Details
+- RGB LEDs are active-LOW (LOW = ON, HIGH = OFF)
+- BOOT button is active-LOW (LOW = pressed)
+- 3-second hold detection with 100ms polling interval
+- WiFi reset clears credentials via WiFiManager.resetSettings()
+- Device restart triggered after WiFi reset for immediate AP mode activation
+
 ## [1.0.0] - 2026-01-07
 
 ### Added
@@ -112,90 +200,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default OTA password is "change-me" - **CHANGE THIS BEFORE DEPLOYMENT**
 - WiFi credentials stored in ESP32 NVS (Non-Volatile Storage)
 - No authentication on web interface - suitable for trusted networks only
-
-## [1.1.0] - 2026-01-08
-
-### Added
-- **WiFi Reset via BOOT Button**: Hold BOOT button (GPIO 0) for 3 seconds during power-up to reset WiFi credentials
-  - Yellow LED indicates button detection
-  - Red LED confirms reset after 3-second hold
-  - Device automatically restarts in AP mode for reconfiguration
-- **Web Interface WiFi Reset**: New `/api/reset-wifi` endpoint for remote WiFi credential reset
-  - Returns JSON status message
-  - Automatically restarts device in AP mode after reset
-- **RGB LED Status Indicators**: Comprehensive visual feedback system using CYD's built-in RGB LED
-  - Blue: Device starting up / Connecting to WiFi
-  - Green flash: WiFi connected / Sensor detected / NTP configured
-  - Yellow: BOOT button detected during startup
-  - Yellow flash: No sensor detected (normal operation)
-  - Red: WiFi reset confirmed / WiFi connection failed
-  - Purple: WiFi config portal active (AP mode)
-  - LED turns off when device is fully operational
-- **WiFiManager Callback Integration**: Config portal mode triggers purple LED indicator
-- **RGB LED Helper Functions**: `setRGBLed()` and `flashRGBLed()` for easy status control
-
-### Changed
-- **Display Mirror in Web UI**: Now shows temperature and humidity instead of IP address
-  - Exactly matches the physical TFT display layout
-  - Includes temperature unit conversion (Celsius/Fahrenheit)
-  - Shows "Sensor: Not detected" when no sensor is present
-- **Web UI Display Mirror Flip Removed**: Display mirror always shows upright orientation in browser
-  - Physical device flip setting no longer affects web UI mirror orientation
-  - Improves user experience for web-based monitoring
-- **Default Display Orientation**: Rotation defaults to IO ports at top, USB on left
-  - Rotation 1 (normal): IO ports top, USB left
-  - Rotation 3 (flipped): IO ports bottom, USB right
-  - Flip setting properly stored in configuration
-
-### Fixed
-- Display orientation now correctly defaults to IO ports at top, USB on left
-- Web UI display mirror no longer flips when device flip setting is toggled
-
-### Documentation
-- Updated README.md with WiFi reset procedures (BOOT button and web interface)
-- Added RGB LED status indicator reference table to README.md
-- Updated API documentation with `/api/reset-wifi` endpoint
-- Added pin configuration for RGB LED and BOOT button
-- Enhanced troubleshooting section with WiFi reset instructions
-- Updated version badge to 1.1.0
-
-### Technical Details
-- RGB LEDs are active-LOW (LOW = ON, HIGH = OFF)
-- BOOT button is active-LOW (LOW = pressed)
-- 3-second hold detection with 100ms polling interval
-- WiFi reset clears credentials via WiFiManager.resetSettings()
-- Device restart triggered after WiFi reset for immediate AP mode activation
-
-## [1.2.0] - Work In Progress
-
-### Added
-- **OTA Progress Visualization**: Visual feedback during Over-The-Air firmware updates
-  - Animated progress bar on TFT display showing upload percentage (0-100%)
-  - Color-coded progress: Red (0-33%), Yellow (33-66%), Green (66-100%)
-  - Real-time percentage display centered on progress bar
-  - Cyan RGB LED indicator during OTA update process
-  - Success screen with "Update Complete!" message and green LED flash
-  - Error handling with detailed error messages on TFT display:
-    - Auth Failed, Begin Failed, Connect Failed, Receive Failed, End Failed
-  - Red LED indicator for failed updates with 3-second error display
-  - Automatic screen clear and return to normal operation after update or error
-
-### Technical Details
-- OTA progress callback updates display in real-time during firmware upload
-- Progress bar dimensions: 280×40 pixels, centered on 320×240 display
-- Uses TFT_eSPI Font 4 for title and percentage text, Font 2 for status message
-- Static `firstDraw` flag ensures screen clears only once at start of update
-- Error messages use detailed switch-case for all ArduinoOTA error types
-
-## [Unreleased]
-
-### Planned Features
-- Additional display modes (date, temperature, custom messages)
-- Multiple color schemes and themes
-- Alarm functionality
-- Touch screen support for direct configuration
-- MQTT integration for remote control
-- Automatic brightness adjustment based on ambient light
 
 ---
 
