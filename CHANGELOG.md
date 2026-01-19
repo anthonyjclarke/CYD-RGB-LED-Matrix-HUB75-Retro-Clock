@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned Features
 
-- Take functions from https://github.com/anthonyjclarke/ESP32_Touchdown_Retro_Clock and incorporate into this clock.
+- Take functions from [ESP32_Touchdown_Retro_Clock](https://github.com/anthonyjclarke/ESP32_Touchdown_Retro_Clock) and incorporate into this clock.
 - Additional display modes (date, temperature, custom messages)
 - Multiple color schemes and themes
 - Alarm functionality
@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - Work In Progress
 
-### Added
+### Added (1.2.0)
+
 - **Serial Boot Version Display**: Firmware version is now displayed in the serial output during bootup for easier identification and troubleshooting.
 - **Enhanced Serial Time Logging**: Serial time output now includes AM/PM indicators when 12-hour format is selected.
 - **OTA Progress Visualization**: Visual feedback during Over-The-Air firmware updates
@@ -33,7 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Red LED indicator for failed updates with 3-second error display
   - Automatic screen clear and return to normal operation after update or error
 
-### Technical Details
+### Technical Details (1.2.0)
+
 - OTA progress callback updates display in real-time during firmware upload
 - Progress bar dimensions: 280×40 pixels, centered on 320×240 display
 - Uses TFT_eSPI Font 4 for title and percentage text, Font 2 for status message
@@ -42,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-01-08
 
-### Added
+### Added (1.1.0)
+
 - **WiFi Reset via BOOT Button**: Hold BOOT button (GPIO 0) for 3 seconds during power-up to reset WiFi credentials
   - Yellow LED indicates button detection
   - Red LED confirms reset after 3-second hold
@@ -61,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **WiFiManager Callback Integration**: Config portal mode triggers purple LED indicator
 - **RGB LED Helper Functions**: `setRGBLed()` and `flashRGBLed()` for easy status control
 
-### Changed
+### Changed (1.1.0)
+
 - **Display Mirror in Web UI**: Now shows temperature and humidity instead of IP address
   - Exactly matches the physical TFT display layout
   - Includes temperature unit conversion (Celsius/Fahrenheit)
@@ -74,11 +78,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Rotation 3 (flipped): IO ports bottom, USB right
   - Flip setting properly stored in configuration
 
-### Fixed
+### Fixed (1.1.0)
+
 - Display orientation now correctly defaults to IO ports at top, USB on left
 - Web UI display mirror no longer flips when device flip setting is toggled
 
-### Documentation
+### Documentation (1.1.0)
+
 - Updated README.md with WiFi reset procedures (BOOT button and web interface)
 - Added RGB LED status indicator reference table to README.md
 - Updated API documentation with `/api/reset-wifi` endpoint
@@ -86,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced troubleshooting section with WiFi reset instructions
 - Updated version badge to 1.1.0
 
-### Technical Details
+### Technical Details (1.1.0)
+
 - RGB LEDs are active-LOW (LOW = ON, HIGH = OFF)
 - BOOT button is active-LOW (LOW = pressed)
 - 3-second hold detection with 100ms polling interval
@@ -95,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-01-07
 
-### Added
+### Added (1.0.0)
+
 - Initial release of CYD RGB LED Matrix (HUB75) Retro Clock
 - 64×32 virtual RGB LED Matrix (HUB75) emulation on 320×240 TFT display
 - Large 7-segment style clock digits with spacing for improved readability
@@ -143,19 +151,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Persistent configuration storage using Preferences (including debug level)
 - Human-readable formatting for uptime (days/hours/minutes) and memory (KB/MB)
 
-### Display Layout
+### Display Layout (1.0.0)
+
 - Top section: Large RGB LED Matrix (HUB75) clock (HH:MM:SS format)
 - Bottom section: 50-pixel status bar with system information
 - Total display area: 320×240 pixels in landscape orientation
 - Emulates physical 64×32 RGB LED Matrix Panel (HUB75 protocol)
 
-### Hardware Support
+### Hardware Support (1.0.0)
+
 - ESP32-2432S028 (CYD - Cheap Yellow Display)
 - ILI9341 TFT display controller
 - Built-in backlight control (GPIO 21)
 - SPI interface for display communication
 
-### Web API
+### Web API (1.0.0)
+
 - `GET /` - Main web interface (index.html)
 - `GET /api/state` - System state JSON (time, date, WiFi, config, diagnostics)
   - Includes: uptime, freeHeap, heapSize, cpuFreq, debugLevel, firmware version
@@ -166,7 +177,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Includes client IP address in logs
 - `GET /api/mirror` - Raw framebuffer data (2048 bytes for 64×32 matrix)
 
-### Configuration
+### Configuration (1.0.0)
+
 - Default timezone: Australia/Sydney
 - Default NTP server: pool.ntp.org
 - Default LED diameter: 5 pixels
@@ -177,7 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frame rate: ~30 FPS (33ms per frame)
 - Morph animation: 20 steps
 
-### Technical Details
+### Technical Details (1.0.0)
+
 - RGB LED Matrix (HUB75) pitch calculation: min(320/64, 190/32) = 5 pixels per LED
 - Framebuffer: 8-bit intensity values (0-255) per pixel
 - Sprite-based rendering for flicker-free display updates
@@ -186,17 +199,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Digit spacing: 1 pixel gap between digits
 - Total clock width: 63 pixels (fits centered in 64-pixel width)
 
-### Fixed
+### Fixed (1.0.0)
+
 - Color picker now properly allows color selection without value being overwritten by auto-refresh
 - Timezone dropdown properly displays all 88 timezones organized by geographic region
 - Web interface automatically applies changes without requiring manual save button click
 - Serial logging now consistently uses [INFO] level for all configuration changes
 - All field type checks in API now use consistent `.isNull()` pattern for reliability
 
-### Known Issues
+### Known Issues (1.0.0)
+
 - None at initial release
 
-### Security Notes
+### Security Notes (1.0.0)
+
 - Default OTA password is "change-me" - **CHANGE THIS BEFORE DEPLOYMENT**
 - WiFi credentials stored in ESP32 NVS (Non-Volatile Storage)
 - No authentication on web interface - suitable for trusted networks only

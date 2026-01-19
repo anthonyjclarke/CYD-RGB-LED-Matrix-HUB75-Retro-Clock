@@ -26,7 +26,7 @@ A retro-style RGB LED Matrix (HUB75) clock emulator for the ESP32-2432S028 (CYD)
 
 ## Project Structure
 
-```
+```text
 CYD_RGB_LED_Matrix_HUB75_Retro_Clock/
 ├── src/
 │   └── main.cpp              # Main application (1850 lines)
@@ -51,25 +51,26 @@ CYD_RGB_LED_Matrix_HUB75_Retro_Clock/
 
 ### Display (SPI)
 
-| Function | GPIO | Notes |
-|----------|------|-------|
-| TFT_MISO | 12 | SPI read (minimal use) |
-| TFT_MOSI | 13 | SPI data out |
-| TFT_SCLK | 14 | SPI clock @ 40MHz |
-| TFT_CS | 15 | Chip select (active LOW) |
-| TFT_DC | 2 | Data/Command signal |
-| TFT_RST | -1 | Connected to ESP32 RST |
-| TFT_BL | 21 | Backlight PWM (0-255) |
+|Function|GPIO|Notes|
+|---|---|---|
+|TFT_MISO|12|SPI read (minimal use)|
+|TFT_MOSI|13|SPI data out|
+|TFT_SCLK|14|SPI clock @ 40MHz|
+|TFT_CS|15|Chip select (active LOW)|
+|TFT_DC|2|Data/Command signal|
+|TFT_RST|-1|Connected to ESP32 RST|
+|TFT_BL|21|Backlight PWM (0-255)|
 
 ### Status Indicators
 
-| Function | GPIO | Notes |
-|----------|------|-------|
-| LED_RED | 4 | Active LOW, status indicator |
-| LED_GREEN | 16 | Active LOW, status indicator |
-| LED_BLUE | 17 | Active LOW, status indicator |
+|Function|GPIO|Notes|
+|---|---|---|
+|LED_RED|4|Active LOW, status indicator|
+|LED_GREEN|16|Active LOW, status indicator|
+|LED_BLUE|17|Active LOW, status indicator|
 
 **RGB LED Status Codes:**
+
 - Blue = Connecting to WiFi
 - Green flash = Success (WiFi connected, NTP configured, sensor detected)
 - Yellow = BOOT button pressed or no sensor detected
@@ -79,18 +80,19 @@ CYD_RGB_LED_Matrix_HUB75_Retro_Clock/
 
 ### User Input
 
-| Function | GPIO | Notes |
-|----------|------|-------|
-| BOOT_BTN | 0 | Built-in button, hold 3s during power-up to reset WiFi |
+|Function|GPIO|Notes|
+|---|---|---|
+|BOOT_BTN|0|Built-in button, hold 3s during power-up to reset WiFi|
 
 ### Optional Sensors (I2C on CN1 Connector)
 
-| Function | GPIO | Notes |
-|----------|------|-------|
-| SENSOR_SDA | 27 | I2C data (BME280/SHT3X/HTU21D) |
-| SENSOR_SCL | 22 | I2C clock |
+|Function|GPIO|Notes|
+|---|---|---|
+|SENSOR_SDA|27|I2C data (BME280/SHT3X/HTU21D)|
+|SENSOR_SCL|22|I2C clock|
 
 **Sensor I2C Addresses:**
+
 - BME280: 0x76 or 0x77
 - SHT3X: 0x44 or 0x45
 - HTU21D: 0x40 (fixed address)
@@ -120,7 +122,7 @@ CYD_RGB_LED_Matrix_HUB75_Retro_Clock/
 
 ### Web API Endpoints
 
-```
+```text
 GET  /                   # Main web interface (index.html)
 GET  /api/state          # System state JSON (time, config, diagnostics)
 GET  /api/timezones      # List of 88 timezones grouped by 13 regions
@@ -211,6 +213,7 @@ DBG_INFO(...)    // Level 3: General info (default)
 DBG_VERBOSE(...) // Level 4: All debug including frequent events
 // Level 0: Off (no output)
 ```
+
 - Controlled via `debugLevel` variable (adjustable via web UI or serial)
 - All config changes logged with before/after values and client IP
 - Sensor readings always logged at INFO level for visibility
@@ -379,5 +382,5 @@ pio run -t upload
 
 **Last Updated:** 2026-01-16
 **Maintainer:** Anthony Clarke
-**Repository:** https://github.com/anthonyjclarke/CYD-RGB-LED-Matrix-HUB75-Retro-Clock
+**Repository:** [CYD-RGB-LED-Matrix-HUB75-Retro-Clock](https://github.com/anthonyjclarke/CYD-RGB-LED-Matrix-HUB75-Retro-Clock)
 **License:** MIT
