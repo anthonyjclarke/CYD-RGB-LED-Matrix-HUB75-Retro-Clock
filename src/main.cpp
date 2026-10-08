@@ -23,7 +23,7 @@
  * - NTP server dropdown with 9 preset servers (global + regional pools)
  * - Runtime-adjustable debug level (Off, Error, Warning, Info, Verbose)
  * - OTA firmware updates for easy maintenance
- * - LittleFS-based web file serving
+ * - Web UI embedded in PROGMEM (generated from data/ by tools/embed_web.py)
  *
  * HARDWARE:
  * - ESP32-2432S028 (CYD) - 2.8" ILI9341 320×240 TFT display
@@ -74,7 +74,6 @@
 
 #include <ArduinoJson.h>
 #include <Preferences.h>
-#include <LittleFS.h>
 
 #include <TFT_eSPI.h>
 
@@ -84,6 +83,7 @@
 
 #include "config.h"
 #include "timezones.h"
+#include "web_assets.h"  // generated from data/ at build time
 
 // Sensor libraries (only one will be used based on config.h)
 #ifdef USE_BME280
@@ -1294,17 +1294,14 @@ static void handleGetMirror() {
 static void serveStaticFiles() {
   server.on("/", HTTP_GET, []() {
     DBG_VERBOSE("Web: GET / (index.html) from %s\n", server.client().remoteIP().toString().c_str());
-    File f = LittleFS.open("/index.html", "r");
-    if (!f) {
-      DBG_WARN("Web: index.html not found\n");
-      server.send(404, "text/plain", "Not found");
-      return;
-    }
-    server.streamFile(f, "text/html");
-    f.close();
+    server.send_P(200, "text/html", (const char*)INDEX_HTML, INDEX_HTML_LEN);
   });
-  server.serveStatic("/app.js", LittleFS, "/app.js");
-  server.serveStatic("/style.css", LittleFS, "/style.css");
+  server.on("/app.js", HTTP_GET, []() {
+    server.send_P(200, "application/javascript", (const char*)APP_JS, APP_JS_LEN);
+  });
+  server.on("/style.css", HTTP_GET, []() {
+    server.send_P(200, "text/css", (const char*)STYLE_CSS, STYLE_CSS_LEN);
+  });
 
   server.onNotFound([]() {
     DBG_VERBOSE("Web: 404 %s from %s\n", server.uri().c_str(), server.client().remoteIP().toString().c_str());
@@ -1759,13 +1756,6 @@ void setup() {
     wm.resetSettings();
     delay(1000);
     DBG_OK("WiFi credentials cleared!");
-  }
-
-  DBG_STEP("Mounting LittleFS...");
-  if (!LittleFS.begin(true)) {
-    DBG_ERR("LittleFS mount failed");
-  } else {
-    DBG_OK("LittleFS mounted");
   }
 
   // TFT init
