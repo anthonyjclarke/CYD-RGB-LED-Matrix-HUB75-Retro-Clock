@@ -1341,7 +1341,7 @@ static void startWifi() {
   wm.setConnectTimeout(20);
   wm.setAPCallback(configModeCallback);  // Set callback for config portal
 
-  bool ok = wm.autoConnect("CYD-RetroClock-Setup");
+  bool ok = wm.autoConnect(AP_NAME);
   if (!ok) {
     DBG_WARN("WiFiManager autoConnect failed/timeout. Starting fallback AP...");
     WiFi.mode(WIFI_AP);
