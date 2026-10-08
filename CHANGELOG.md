@@ -17,6 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MQTT integration for remote control
 - Automatic brightness adjustment based on ambient light
 
+## [1.3.0] - Unreleased
+
+### Added (1.3.0)
+
+- **Browser installer**: [anthonyjclarke.github.io/CYD-RGB-LED-Matrix-HUB75-Retro-Clock](https://anthonyjclarke.github.io/CYD-RGB-LED-Matrix-HUB75-Retro-Clock/) flashes the latest release from Chrome/Edge (ESP Web Tools, via [cyd-web-installer](https://github.com/anthonyjclarke/cyd-web-installer)).
+- **Improv-Serial WiFi setup, always on**: the installer's **Configure WiFi** sets WiFi over USB, and a board already running this firmware is offered **Update**, which keeps settings. The WiFiManager portal now runs non-blocking so Improv is answered while it is up.
+- **Release workflow** (`.github/workflows/firmware.yml`): every push builds in CI; a `v*` tag on `main` publishes the release (`*-firmware.bin`, `*-merged.bin`, `SHA256SUMS.txt`) and the installer page.
+- `PROJECT_NAME` and `AP_NAME` in `include/config.h`; boot log line showing the running OTA partition (`Running from app0/app1`).
+
+### Changed (1.3.0)
+
+- **Web UI embedded in PROGMEM**: `tools/embed_web.py` turns `data/` into `src/web_assets.h` at build time. LittleFS is no longer used and the `uploadfs` step is gone.
+- **Partition table**: `default.csv` → standard CYD dual-OTA `partitions_custom.csv` (two 1.792 MB app slots). NVS stays at `0x9000`, so settings and WiFi survive the switch; no erase is needed.
+- Platform pinned to `espressif32@6.12.0` (unpinned now resolves to an Arduino 3.x core, which this code doesn't build on).
+- `DBG_*` macros moved from `main.cpp` to `include/debug.h`.
+
 ## [1.2.0] - Work In Progress
 
 ### Added (1.2.0)
