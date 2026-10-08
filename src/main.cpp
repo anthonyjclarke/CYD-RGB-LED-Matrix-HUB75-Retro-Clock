@@ -84,6 +84,8 @@
 #include "config.h"
 #include "timezones.h"
 #include "web_assets.h"  // generated from data/ at build time
+#include "network/improv_setup.h"
+#include <esp_ota_ops.h>
 
 // Sensor libraries (only one will be used based on config.h)
 #ifdef USE_BME280
@@ -97,58 +99,12 @@
 #endif
 
 // =========================
-// Debug System
+// Debug System (macros in include/debug.h)
 // =========================
-/**
- * Leveled debug logging system with runtime control
- *
- * DEBUG LEVELS:
- *   0 = Off      - No debug output
- *   1 = Error    - Critical errors only
- *   2 = Warn     - Warnings + Errors
- *   3 = Info     - General info + Warnings + Errors (default)
- *   4 = Verbose  - All debug output including frequent events
- *
- * USAGE:
- *   DBG_ERROR(...)   - Critical errors (level 1+)
- *   DBG_WARN(...)    - Warnings (level 2+)
- *   DBG_INFO(...)    - General information (level 3+)
- *   DBG_VERBOSE(...) - Verbose/frequent output (level 4)
- *
- * RUNTIME CONTROL:
- *   Set debugLevel variable (0-4) to change verbosity at runtime
- *   Can be controlled via web API or serial commands
- *
- * EXAMPLES:
- *   DBG_ERROR("Failed to mount filesystem\n");
- *   DBG_INFO("WiFi connected: %s\n", WiFi.SSID().c_str());
- *   DBG_VERBOSE("Render frame: %d ms\n", elapsed);
- */
-#ifndef DEBUG_LEVEL
-#define DEBUG_LEVEL 3  // Default: Info level
-#endif
-
-#define DBG_LEVEL_OFF     0
-#define DBG_LEVEL_ERROR   1
-#define DBG_LEVEL_WARN    2
-#define DBG_LEVEL_INFO    3
-#define DBG_LEVEL_VERBOSE 4
+#include "debug.h"
 
 // Runtime debug level control (can be changed via web API)
-static uint8_t debugLevel = DEBUG_LEVEL;
-
-// Conditional debug macros based on debug level
-#define DBG_ERROR(...)   do { if (debugLevel >= DBG_LEVEL_ERROR) { Serial.print("[ERR ] "); Serial.printf(__VA_ARGS__); } } while(0)
-#define DBG_WARN(...)    do { if (debugLevel >= DBG_LEVEL_WARN) { Serial.print("[WARN] "); Serial.printf(__VA_ARGS__); } } while(0)
-#define DBG_INFO(...)    do { if (debugLevel >= DBG_LEVEL_INFO) { Serial.print("[INFO] "); Serial.printf(__VA_ARGS__); } } while(0)
-#define DBG_VERBOSE(...) do { if (debugLevel >= DBG_LEVEL_VERBOSE) { Serial.print("[VERB] "); Serial.printf(__VA_ARGS__); } } while(0)
-
-// Legacy compatibility macros
-#define DBG(...)      DBG_INFO(__VA_ARGS__)
-#define DBGLN(s)      DBG_INFO("%s\n", s)
-#define DBG_STEP(s)   DBG_INFO("%s\n", s)
-#define DBG_OK(s)     DBG_INFO("✓ %s\n", s)
-#define DBG_ERR(s)    DBG_ERROR("%s\n", s)
+uint8_t debugLevel = DEBUG_LEVEL;
 
 // =========================
 // Global Objects & Application State
@@ -1338,7 +1294,19 @@ static void startWifi() {
   wm.setConnectTimeout(20);
   wm.setAPCallback(configModeCallback);  // Set callback for config portal
 
+#if IMPROV_SETUP_ENABLED
+  // Non-blocking portal so Improv (web installer "Configure WiFi") is answered
+  // while the setup AP is up. process() still honours the 180s portal timeout.
+  wm.setConfigPortalBlocking(false);
+#endif
   bool ok = wm.autoConnect(AP_NAME);
+#if IMPROV_SETUP_ENABLED
+  while (!ok && wm.getConfigPortalActive()) {
+    if (wm.process()) { ok = true; break; }
+    improvTick();  // restarts once Improv credentials connect
+    delay(5);
+  }
+#endif
   if (!ok) {
     DBG_WARN("WiFiManager autoConnect failed/timeout. Starting fallback AP...");
     WiFi.mode(WIFI_AP);
@@ -1698,6 +1666,7 @@ static void drawFrame() {
 // =========================
 void setup() {
   Serial.begin(115200);
+  improvBegin();  // Improv-Serial for the web installer; before WiFi starts
   delay(250);
 
   DBGLN("");
@@ -1706,6 +1675,7 @@ void setup() {
   DBGLN("========================================");
 
   DBG("Version: %s\n", FIRMWARE_VERSION);
+  DBG_INFO("Running from %s\n", esp_ota_get_running_partition()->label);
   DBG("Build: %s %s\n", __DATE__, __TIME__);
   DBG("LED grid: %dx%d (fb size: %u bytes)\n", LED_MATRIX_W, LED_MATRIX_H, (unsigned)sizeof(fb));
   DBG("TFT_eSPI version check...\n");
@@ -1824,6 +1794,7 @@ void setup() {
 }
 
 void loop() {
+  improvTick();  // must run at least every ~1s for the web installer
   ArduinoOTA.handle();
   server.handleClient();
 
