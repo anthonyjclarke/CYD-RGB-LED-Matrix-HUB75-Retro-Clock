@@ -34,3 +34,6 @@ local_config.h
 
 # Generated from data/ by tools/embed_web.py
 src/web_assets.h
+
+# Local web installer preview (built with local secrets - never publish)
+_site/
