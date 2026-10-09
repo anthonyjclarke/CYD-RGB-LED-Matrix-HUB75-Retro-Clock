@@ -5,8 +5,14 @@
 // Starting scope: WiFiManager + NTP + WebUI + TFT "LED Matrix" emulation + simple morphing
 // -----------------------------
 
-// ===== FIRMWARE VERSION =====
-#define FIRMWARE_VERSION "1.2.0"
+// ===== FIRMWARE VERSION / IDENTITY =====
+// The web installer reads both strings. A v* release tag must equal "v" + FIRMWARE_VERSION.
+#define FIRMWARE_VERSION "1.3.0"
+#define PROJECT_NAME "CYD-RGB-LED-Matrix-HUB75-Retro-Clock"  // frozen: Improv + manifest name
+
+// ===== WEB INSTALLER (Improv-Serial) =====
+#define IMPROV_SETUP_ENABLED 1
+#define IMPROV_DEVICE_PREFIX "RetroClock"  // shown as RetroClock-XXXX in the installer
 
 // ===== LED MATRIX EMULATION =====
 // Logical LED grid (single 64x32 panel)
@@ -59,6 +65,9 @@
 // ===== BOOT BUTTON =====
 // Boot button for WiFi reset (active LOW)
 #define BOOT_BTN_PIN   0    // Boot button (built-in on CYD)
+
+// ===== WIFI SETUP =====
+#define AP_NAME "CYD-RetroClock-Setup"  // WiFiManager setup hotspot
 
 // ===== OTA =====
 #define OTA_HOSTNAME "CYD-RetroClock"

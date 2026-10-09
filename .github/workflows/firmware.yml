@@ -1,0 +1,11 @@
+# Copy to .github/workflows/firmware.yml in a CYD project. Builds every board
+# on each push and PR; a v* tag on main publishes the release and installer.
+name: Firmware
+on:
+  push: { branches: [dev, main], tags: ["v*"] }
+  pull_request:
+  workflow_dispatch:
+jobs:
+  firmware:
+    uses: anthonyjclarke/cyd-web-installer/.github/workflows/cyd-release.yml@main
+    permissions: { contents: write, pages: write, id-token: write }

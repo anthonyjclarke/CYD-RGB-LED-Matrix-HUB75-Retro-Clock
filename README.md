@@ -1,7 +1,7 @@
 # CYD RGB LED Matrix (HUB75) Retro Clock
 
 <!-- Note: Update version badge below when FIRMWARE_VERSION changes in include/config.h -->
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-ESP32-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 ![LED Type](https://img.shields.io/badge/LED-HUB75%20RGB-red.svg)
@@ -14,6 +14,36 @@ A retro-style RGB LED Matrix (HUB75) clock for the ESP32-2432S028 (CYD - Cheap Y
 
 
 ![Clock Display](images/Display1_anim.gif)
+
+## Install
+
+**[anthonyjclarke.github.io/CYD-RGB-LED-Matrix-HUB75-Retro-Clock][installer]**
+installs the latest release from the browser – no PlatformIO, no drivers to
+build. It needs desktop Chrome, Edge or Opera.
+
+1. Pick your board – the CYD 2.8″ (ESP32-2432S028R).
+2. Plug it in with a USB data cable, click **Connect & install** and choose its
+   port.
+3. On a new board, say yes to erasing it. When flashing finishes, choose
+   **Configure WiFi** and pick your network. (The `CYD-RetroClock-Setup`
+   hotspot still works as an alternative.)
+4. **Visit device** opens the clock's web page.
+
+A board already running this firmware is recognised and offered **Update**,
+which keeps its settings and WiFi. You need nothing else – no API keys, and
+the optional I2C sensor is detected at boot. Each [release][releases] also
+carries the images for flashing by hand. `*-firmware.bin` is the app image for
+an ArduinoOTA upload (`espota.py`). `*-merged.bin` is a clean install at `0x0`
+with esptool, and it **erases settings and WiFi**.
+
+Coming from v1.2.0 or earlier? Those builds can't identify themselves to the
+installer, so it offers **Install** rather than Update. Answer **no** to
+erasing and your settings and WiFi are kept. v1.3.0 moves to the standard
+dual-OTA partition table, and the web UI is now built into the firmware, so
+the old LittleFS upload is no longer needed.
+
+[installer]: https://anthonyjclarke.github.io/CYD-RGB-LED-Matrix-HUB75-Retro-Clock/
+[releases]: https://github.com/anthonyjclarke/CYD-RGB-LED-Matrix-HUB75-Retro-Clock/releases
 
 ## Features
 
@@ -97,6 +127,10 @@ BOOT_BTN_PIN   0   // Boot button for WiFi reset (active LOW)
 
 ## Software Setup
 
+Building it yourself is only needed for development – the [installer](#install)
+is the easy route. A local build compiles in anything in your tree, so never
+publish a local build: release images come only from CI on a `v*` tag.
+
 ### Prerequisites
 - [Visual Studio Code](https://code.visualstudio.com/)
 - [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
@@ -106,8 +140,8 @@ BOOT_BTN_PIN   0   // Boot button for WiFi reset (active LOW)
 
 #### 1. Clone or Download the Project
 ```bash
-git clone <repository-url>
-cd CYD_LED_Matrix_Retro_Clock
+git clone https://github.com/anthonyjclarke/CYD-RGB-LED-Matrix-HUB75-Retro-Clock.git
+cd CYD-RGB-LED-Matrix-HUB75-Retro-Clock
 ```
 
 #### 2. Open in VS Code with PlatformIO
@@ -124,12 +158,10 @@ code .
 - Select "Upload" from PlatformIO menu or press `Ctrl+Alt+U`
 - Wait for upload to complete (~30 seconds)
 
-#### 5. Upload Filesystem (Web UI)
-- Select "Upload Filesystem Image" from PlatformIO menu
-- This uploads the web interface files to LittleFS
-- Wait for upload to complete (~10 seconds)
+The web UI in `data/` is embedded into the firmware at build time by
+`tools/embed_web.py`, so there is no separate filesystem upload.
 
-#### 6. Configure WiFi
+#### 5. Configure WiFi
 On first boot, the device will create a WiFi access point:
 
 1. Look for WiFi network: **CYD-RetroClock-Setup**
@@ -148,7 +180,7 @@ On first boot, the device will create a WiFi access point:
   - Device will restart in AP mode for reconfiguration
 - **Web Interface Reset**: Use the `/api/reset-wifi` endpoint to reset WiFi remotely (see API section)
 
-#### 7. Access the Web Interface
+#### 6. Access the Web Interface
 1. Check your router for the device's IP address, or
 2. Look at the TFT display's status bar (bottom) for the IP
 3. Open a web browser and navigate to: `http://<device-ip>`
@@ -384,16 +416,25 @@ The ArduinoOTA service runs on port 3232. You can use the Arduino IDE's network 
 ### Project Structure
 ```
 CYD_LED_Matrix_Retro_Clock/
-├── data/                      # Web UI files (uploaded to LittleFS)
+├── .github/workflows/
+│   └── firmware.yml          # CI build; v* tag publishes release + installer
+├── data/                      # Web UI source (embedded in PROGMEM at build time)
 │   ├── index.html            # Main web interface with diagnostics panel
 │   ├── app.js                # JavaScript for live updates, display mirror, and formatting utilities
 │   └── style.css             # Stylesheet with status panel and footer styles
 ├── include/
-│   ├── config.h              # Configuration constants including FIRMWARE_VERSION
+│   ├── config.h              # Configuration constants incl. FIRMWARE_VERSION, PROJECT_NAME
+│   ├── debug.h               # Leveled DBG_* macros
 │   ├── timezones.h           # 88 timezones across 13 geographic regions
 │   └── User_Setup.h          # TFT_eSPI pin configuration
+├── lib/ImprovWiFi/           # Vendored Improv library (parser fix) – don't add to lib_deps
 ├── src/
-│   └── main.cpp              # Main application code with enhanced logging and diagnostics
+│   ├── main.cpp              # Main application code with enhanced logging and diagnostics
+│   └── network/improv_setup.*  # Always-on Improv-Serial for the web installer
+├── tools/
+│   ├── embed_web.py          # pre: script – data/ → src/web_assets.h (generated)
+│   └── merge_bin.py          # post: script – flash_parts.json + merged image
+├── partitions_custom.csv     # Standard CYD dual-OTA table (frozen)
 ├── platformio.ini            # PlatformIO configuration
 ├── CHANGELOG.md              # Version history (updated for v1.0.0)
 ├── LICENSE                   # MIT License
