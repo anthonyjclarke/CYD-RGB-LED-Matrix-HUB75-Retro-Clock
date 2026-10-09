@@ -58,8 +58,8 @@ the bench board (case 2 below).
 
 ## Tests owed
 
-Smoke-tested only. Run these on the next real work on this project, or before
-the next release, and tick them off with date and board MAC. This project
+All cases below have passed on the bench board, so nothing is owed for the
+next release unless a 5b trigger recurs. This project
 meets several 5b triggers (partition switch, platform pin, Improv and portal
 loop changes, first release with OTA), so clear this list before the release
 after v1.3.0.
@@ -73,5 +73,12 @@ after v1.3.0.
       (`espota.py`) of a local 1.4.0-dev build → `Running from app1`; Update
       from the live v1.3.0 page → `Version: 1.3.0`, `Running from app0`,
       `flipDisplay` and WiFi kept
-- [ ] Extra – v1.2.0 board (`default.csv`, LittleFS) → Install without erase;
-      settings and WiFi kept, web UI served from PROGMEM
+- [x] Extra – v1.2.0 board (`default.csv`, LittleFS) → Install without erase
+      (10-10-2026, `b0:cb:d8:da:ae:8c`): v1.2.0 (`e50324b`, built with a
+      temporary 6.12.0 pin) flashed over USB keeping NVS, LED colour set to
+      green by v1.2.0's API. The live page offered Install (no Improv in
+      v1.2.0); answered No to erase. Boot: `Version: 1.3.0`, `Running from
+      app0`, `Color: #00FF00`, `FlipDisplay: true`, WiFi rejoined silently,
+      web UI 200 from PROGMEM. The v1.2.0 LittleFS image wasn't uploaded
+      (this Mac has no arm64 `mklittlefs`); v1.3.0 never mounts it and the
+      old data partition lies inside the new `app1`, so it can't affect this.
