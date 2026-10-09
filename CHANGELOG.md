@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MQTT integration for remote control
 - Automatic brightness adjustment based on ambient light
 
-## [1.3.0] - Unreleased
+## [1.3.0] - 10-10-2026
 
 ### Added (1.3.0)
 

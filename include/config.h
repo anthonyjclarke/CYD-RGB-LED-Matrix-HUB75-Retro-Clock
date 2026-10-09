@@ -7,7 +7,7 @@
 
 // ===== FIRMWARE VERSION / IDENTITY =====
 // The web installer reads both strings. A v* release tag must equal "v" + FIRMWARE_VERSION.
-#define FIRMWARE_VERSION "1.3.0-dev"
+#define FIRMWARE_VERSION "1.3.0"
 #define PROJECT_NAME "CYD-RGB-LED-Matrix-HUB75-Retro-Clock"  // frozen: Improv + manifest name
 
 // ===== WEB INSTALLER (Improv-Serial) =====
