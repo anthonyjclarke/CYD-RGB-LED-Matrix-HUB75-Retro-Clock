@@ -55,6 +55,8 @@ reintroduce LittleFS for the UI: the installer flashes four parts only.
 - Never put Improv back in `lib_deps` – `lib/ImprovWiFi` is the patched copy.
 - `improvTick()` must run at least every ~1 s (loop and WiFiManager portal);
   nothing in `loop()` may block longer.
+- Before the next release, clear *Tests owed* in docs/WEB_INSTALLER.md
+  (RUNBOOK 5b).
 
 ## Gotchas
 

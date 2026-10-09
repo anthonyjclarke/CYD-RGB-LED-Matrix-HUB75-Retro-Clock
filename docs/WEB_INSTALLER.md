@@ -1,0 +1,49 @@
+# Web installer
+
+The browser installer at
+[anthonyjclarke.github.io/CYD-RGB-LED-Matrix-HUB75-Retro-Clock](https://anthonyjclarke.github.io/CYD-RGB-LED-Matrix-HUB75-Retro-Clock/)
+uses the shared [cyd-web-installer](https://github.com/anthonyjclarke/cyd-web-installer)
+workflow. Release images are built only by CI on a `v*` tag on `main`.
+
+---
+
+## Project specifics
+
+| Item              | Value                                   |
+|:------------------|:----------------------------------------|
+| `PROJECT_NAME`    | `CYD-RGB-LED-Matrix-HUB75-Retro-Clock`  |
+| Envs in installer | `cyd_esp32_2432s028` (CYD 2.8″)         |
+| Partition table   | `partitions_custom.csv` (frozen)        |
+| Platform          | `espressif32@6.12.0`                    |
+| Setup AP          | `CYD-RetroClock-Setup`                  |
+| OTA               | ArduinoOTA – so the `app1` case applies |
+| Filesystem        | None – web UI is in PROGMEM             |
+
+v1.3.0 moved from `default.csv` to the standard dual-OTA table. NVS, `otadata`
+and `app0` keep their offsets, so a v1.2.0 board can take **Install** without
+erasing and keep its settings. LittleFS held only the web UI, which is now
+embedded by `tools/embed_web.py`.
+
+---
+
+## Smoke test (RUNBOOK 5a)
+
+| Date | Board MAC | CI run | Result |
+|:-----|:----------|:-------|:-------|
+| –    | –         | –      | Pending |
+
+---
+
+## Tests owed
+
+Smoke-tested only. Run these on the next real work on this project, or before
+the next release, and tick them off with date and board MAC. This project
+meets several 5b triggers (partition switch, platform pin, Improv and portal
+loop changes, first release with OTA), so clear this list before the release
+after v1.3.0.
+
+- [ ] Case 1 – fresh install, erased, on each remaining board
+- [ ] Case 2 – Update on a provisioned board (settings kept)
+- [ ] Case 3 – Update from `app1` (ArduinoOTA, then Update → `app0`)
+- [ ] Extra – v1.2.0 board (`default.csv`, LittleFS) → Install without erase;
+      settings and WiFi kept, web UI served from PROGMEM
