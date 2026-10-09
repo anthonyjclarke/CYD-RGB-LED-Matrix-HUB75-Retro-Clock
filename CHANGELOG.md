@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Platform pinned to `espressif32@6.12.0` (unpinned now resolves to an Arduino 3.x core, which this code doesn't build on).
 - `DBG_*` macros moved from `main.cpp` to `include/debug.h`.
 
+### Fixed (1.3.0)
+
+- Vendored `lib/ImprovWiFi` synced with cyd-web-installer 1.0.1: each Improv packet now starts on a new line, so serial noise when the port opens no longer makes **Connect** offer Install instead of Update.
+
 ## [1.2.0] - Work In Progress
 
 ### Added (1.2.0)
