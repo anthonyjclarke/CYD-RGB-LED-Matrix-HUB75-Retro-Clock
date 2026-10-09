@@ -415,7 +415,7 @@ The ArduinoOTA service runs on port 3232. You can use the Arduino IDE's network 
 
 ### Project Structure
 ```
-CYD_LED_Matrix_Retro_Clock/
+CYD-RGB-LED-Matrix-HUB75-Retro-Clock/
 ├── .github/workflows/
 │   └── firmware.yml          # CI build; v* tag publishes release + installer
 ├── data/                      # Web UI source (embedded in PROGMEM at build time)

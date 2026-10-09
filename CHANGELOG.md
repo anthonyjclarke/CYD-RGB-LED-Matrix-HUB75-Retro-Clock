@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - Unreleased
 
+### Fixed (1.4.0)
+
+- Web UI footer GitHub link pointed at the old repo name (`CYD-LED-Matrix-Retro-Clock`); it now links to `CYD-RGB-LED-Matrix-HUB75-Retro-Clock`.
+
 ## [1.3.0] - 10-10-2026
 
 ### Added (1.3.0)
