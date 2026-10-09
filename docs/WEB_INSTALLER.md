@@ -28,9 +28,22 @@ embedded by `tools/embed_web.py`.
 
 ## Smoke test (RUNBOOK 5a)
 
-| Date | Board MAC | CI run | Result |
-|:-----|:----------|:-------|:-------|
-| –    | –         | –      | Pending |
+| Item           | Result                                       |
+|:---------------|:---------------------------------------------|
+| Date           | 10-10-2026                                   |
+| Board          | CYD 2.8″ ESP32-D0WD-V3 · `b0:cb:d8:da:ae:8c` |
+| Image          | CI preview, run 37911340756 (`73960e0`)      |
+| Browser        | macOS Chrome                                 |
+| Fresh install  | Pass – erased, Install + erase               |
+| Configure WiFi | Pass – Improv joined WiFi, no setup AP       |
+| Boot log       | Pass – `Running from app0`, NTP, no crash    |
+| Connect again  | Pass – "Connected to RetroClock-CBB0"        |
+| Web UI         | Pass – all three files served from PROGMEM   |
+
+The second Connect reported `CYD-RGB-LED-Matrix-HUB75-Retro-Clock 1.3.0-dev
+(ESP32)` with **Visit Device** and **Change Wi-Fi**, so Improv answers in
+time and `PROJECT_NAME` matches the manifest. Improv 1.0.1 (packet on a new
+line) was in this image.
 
 ---
 
@@ -42,7 +55,8 @@ meets several 5b triggers (partition switch, platform pin, Improv and portal
 loop changes, first release with OTA), so clear this list before the release
 after v1.3.0.
 
-- [ ] Case 1 – fresh install, erased, on each remaining board
+- [x] Case 1 – fresh install, erased (10-10-2026, `b0:cb:d8:da:ae:8c`; the
+      only board env)
 - [ ] Case 2 – Update on a provisioned board (settings kept)
 - [ ] Case 3 – Update from `app1` (ArduinoOTA, then Update → `app0`)
 - [ ] Extra – v1.2.0 board (`default.csv`, LittleFS) → Install without erase;
