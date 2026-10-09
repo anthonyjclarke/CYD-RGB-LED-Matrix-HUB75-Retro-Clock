@@ -69,6 +69,9 @@ after v1.3.0.
 - [x] Case 2 – Update on a provisioned board (10-10-2026, `b0:cb:d8:da:ae:8c`):
       live page v1.3.0 over 1.3.0-dev; `flipDisplay` changed beforehand was
       kept, WiFi kept, boot log `Version: 1.3.0`, `Running from app0`
-- [ ] Case 3 – Update from `app1` (ArduinoOTA, then Update → `app0`)
+- [x] Case 3 – Update from `app1` (10-10-2026, `b0:cb:d8:da:ae:8c`): ArduinoOTA
+      (`espota.py`) of a local 1.4.0-dev build → `Running from app1`; Update
+      from the live v1.3.0 page → `Version: 1.3.0`, `Running from app0`,
+      `flipDisplay` and WiFi kept
 - [ ] Extra – v1.2.0 board (`default.csv`, LittleFS) → Install without erase;
       settings and WiFi kept, web UI served from PROGMEM
