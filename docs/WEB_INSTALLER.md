@@ -47,6 +47,15 @@ line) was in this image.
 
 ---
 
+## Release check (RUNBOOK 7.4)
+
+v1.3.0 released 10-10-2026 (tag run 37982120293). The live page loads,
+`index.json` shows `1.3.0`, and the release has `*-firmware.bin`,
+`*-merged.bin` and `SHA256SUMS.txt`. One Update from the live page passed on
+the bench board (case 2 below).
+
+---
+
 ## Tests owed
 
 Smoke-tested only. Run these on the next real work on this project, or before
@@ -57,7 +66,9 @@ after v1.3.0.
 
 - [x] Case 1 – fresh install, erased (10-10-2026, `b0:cb:d8:da:ae:8c`; the
       only board env)
-- [ ] Case 2 – Update on a provisioned board (settings kept)
+- [x] Case 2 – Update on a provisioned board (10-10-2026, `b0:cb:d8:da:ae:8c`):
+      live page v1.3.0 over 1.3.0-dev; `flipDisplay` changed beforehand was
+      kept, WiFi kept, boot log `Version: 1.3.0`, `Running from app0`
 - [ ] Case 3 – Update from `app1` (ArduinoOTA, then Update → `app0`)
 - [ ] Extra – v1.2.0 board (`default.csv`, LittleFS) → Install without erase;
       settings and WiFi kept, web UI served from PROGMEM
